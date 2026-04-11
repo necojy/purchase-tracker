@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Item {
+  id          Int              @id @default(autoincrement())
+  name        String
+  sellPrice   Int              // 售出價格
+  purchases   PurchaseRecord[] // 關聯的購買紀錄
+}
+
+model PurchaseRecord {
+  id             Int      @id @default(autoincrement())
+  itemId         Int
+  // 🌟 修改下面這一行，加上 onDelete: Cascade
+  item           Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  costPrice      Int      
+  purchaseDate   DateTime @default(now())
+  location       String   
+  buyer          String   
+  paymentMethod  String   
+  pickupLocation String   
+}
