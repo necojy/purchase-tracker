@@ -9,22 +9,31 @@ datasource db {
 }
 
 model Item {
-  id          Int              @id @default(autoincrement())
-  name        String
-  sellPrice   Int              // 售出價格
-  purchases   PurchaseRecord[] // 關聯的購買紀錄
+  id            Int            @id @default(autoincrement())
+  name          String
+  sellPrice     Int            
+  purchaseItems PurchaseItem[] 
 }
 
+// 主訂單 (移除整筆總成本)
 model PurchaseRecord {
-  id             Int      @id @default(autoincrement())
-  itemId         Int
-  // 🌟 修改下面這一行，加上 onDelete: Cascade
-  item           Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  costPrice      Int      
-  purchaseDate   DateTime @default(now())
+  id             Int            @id @default(autoincrement())
+  purchaseDate   DateTime       @default(now())
   location       String   
   buyer          String   
-  paymentMethod  String   
+  paymentMethod  String         @default("貨到付款") 
   pickupLocation String   
-  isReconciled   Boolean  @default(false) // 🌟 新增這一行：預設為「未對帳 (false)」
+  isReconciled   Boolean        @default(false)
+  items          PurchaseItem[] 
+}
+
+// 訂單明細 (🌟 加上進貨單價)
+model PurchaseItem {
+  id             Int            @id @default(autoincrement())
+  recordId       Int
+  record         PurchaseRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  itemId         Int
+  item           Item           @relation(fields: [itemId], references: [id])
+  quantity       Int            @default(1)
+  costPrice      Int            @default(0) // 🌟 每個商品的進貨單價
 }
