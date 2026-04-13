@@ -5,8 +5,19 @@ import ItemManager from "@/components/ItemManager";
 import RecordManager from "@/components/RecordManager";
 import Dashboard from "@/components/Dashboard"; 
 
+// 🌟 更新這裡的型別字典，對齊我們最新的「一對多」資料庫架構
 type Item = { id: number; name: string; sellPrice: number; };
-type RecordType = { id: number; costPrice: number; location: string; buyer: string; purchaseDate: string; item: Item; itemId: number; pickupLocation: string; isReconciled: boolean; };
+type PurchaseItem = { id: number; quantity: number; costPrice: number; item: Item; itemId: number; };
+type RecordType = { 
+  id: number; 
+  location: string; 
+  buyer: string; 
+  paymentMethod: string; 
+  purchaseDate: string; 
+  pickupLocation: string; 
+  isReconciled: boolean; 
+  items: PurchaseItem[]; // 🌟 包含多個商品明細
+};
 
 export default function Home() {
   const [items, setItems] = useState<Item[]>([]);
@@ -18,9 +29,24 @@ export default function Home() {
         fetch("/api/items", { cache: "no-store" }),
         fetch("/api/records", { cache: "no-store" })
       ]);
-      setItems(await itemsRes.json());
-      setRecords(await recordsRes.json());
-    } catch (error) { console.error("抓取失敗", error); }
+      
+      if (itemsRes.ok) {
+        const data = await itemsRes.json();
+        setItems(Array.isArray(data) ? data : []);
+      } else {
+        console.error("品項 API 發生錯誤");
+      }
+
+      if (recordsRes.ok) {
+        const data = await recordsRes.json();
+        setRecords(Array.isArray(data) ? data : []);
+      } else {
+        console.error("紀錄 API 發生錯誤");
+      }
+      
+    } catch (error) { 
+      console.error("抓取失敗", error); 
+    }
   };
 
   useEffect(() => { fetchData(); }, []);

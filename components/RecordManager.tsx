@@ -82,11 +82,11 @@ export default function RecordManager({ items, records, refreshData }: Props) {
     setExpandedRecordId(null); refreshData();
   };
 
-  const handleToggleReconcile = async (id: number, currentStatus: boolean, e: React.MouseEvent) => {
-    e.stopPropagation(); // 避免點擊打勾時觸發展開
-    await fetch("/api/records", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, isReconciled: !currentStatus }) });
-    refreshData();
-  };
+  const handleToggleReconcile = async (id: number, currentStatus: boolean, e: React.ChangeEvent<HTMLInputElement>) => {
+  e.stopPropagation(); // 避免點擊打勾時觸發展開
+  await fetch("/api/records", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, isReconciled: !currentStatus }) });
+  refreshData();
+};
 
   return (
     <div>
