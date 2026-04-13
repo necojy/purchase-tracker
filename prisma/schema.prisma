@@ -26,4 +26,5 @@ model PurchaseRecord {
   buyer          String   
   paymentMethod  String   
   pickupLocation String   
+  isReconciled   Boolean  @default(false) // 🌟 新增這一行：預設為「未對帳 (false)」
 }
