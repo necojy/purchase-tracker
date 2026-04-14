@@ -12,9 +12,6 @@ export default function RecordManager({ items, records, refreshData }: Props) {
   const [isAddingRecord, setIsAddingRecord] = useState(false);
   const [expandedRecordId, setExpandedRecordId] = useState<number | null>(null);
   
-  // 🌟 折扣與智慧計算狀態
-  const [globalDiscount, setGlobalDiscount] = useState<string>("");
-  
   // 主單資訊 (costPrice 這裡作為「最終結帳總額」)
   const [recordForm, setRecordForm] = useState({ costPrice: "", location: "蝦皮", buyer: "洪", paymentMethod: "信用卡", pickupLocation: "" });
   
@@ -27,16 +24,11 @@ export default function RecordManager({ items, records, refreshData }: Props) {
 
   useEffect(() => {
     if (items.length > 0 && !recordItems[0].itemId) {
-      setRecordItems([{ 
-        itemId: items[0].id.toString(), 
-        quantity: 1, 
-        originalPrice: items[0].originalPrice?.toString() || "", // 🌟 自動帶入原價
-        costPrice: "" 
-      }]);
+      setRecordItems([{ itemId: items[0].id.toString(), quantity: 1, originalPrice: items[0].originalPrice?.toString() || "", costPrice: "" }]);
     }
   }, [items]);
 
-  // --- 💡 核心功能：智慧分配進貨單價 ---
+  // --- 💡 核心功能：智慧分配進貨單價 (已精簡) ---
   const handleAutoDistribute = () => {
     // 1. 計算所有「店內單價 × 數量」的總原價
     const totalOrig = recordItems.reduce((sum, item) => sum + (Number(item.originalPrice) || 0) * item.quantity, 0);
@@ -46,20 +38,14 @@ export default function RecordManager({ items, records, refreshData }: Props) {
       return;
     }
 
-    let finalTotal = Number(recordForm.costPrice);
-
-    // 2. 如果沒有填最終結帳總額，但有填全館折數，幫忙推算結帳總額
-    if (!finalTotal && globalDiscount) {
-      finalTotal = Math.round(totalOrig * (Number(globalDiscount) / 100));
-      setRecordForm(prev => ({ ...prev, costPrice: finalTotal.toString() }));
-    }
+    const finalTotal = Number(recordForm.costPrice);
 
     if (!finalTotal) {
-      alert("❌ 請輸入「最終結帳總額」或「全館折扣」來進行分配！");
+      alert("❌ 請輸入「最終結帳發票總額」來進行分配！");
       return;
     }
 
-    // 3. 按照比例將最終結帳總額分攤到每一個商品的「進貨單價」
+    // 2. 按照比例將最終結帳總額分攤到每一個商品的「進貨單價」
     const newItems = recordItems.map(item => {
       const orig = Number(item.originalPrice) || 0;
       // 分攤公式：總結帳金額 × (單一商品原價 / 總原價)
@@ -82,22 +68,16 @@ export default function RecordManager({ items, records, refreshData }: Props) {
         newItems[index].costPrice = ""; // 清空進貨單價，讓使用者重新跑自動計算
       }
     }
-    // 當輸入「店內原價」時，自動依據目前的折扣算出「進貨單價」
-    else if (field === 'originalPrice') {
-      const orig = Number(value) || 0;
-      const disc = globalDiscount === "" ? 100 : Number(globalDiscount);
-      newItems[index].costPrice = orig > 0 ? Math.round(orig * (disc / 100)).toString() : "";
-    }
     
     setRecordItems(newItems);
   };
 
-const addRecordItem = () => {
+  const addRecordItem = () => {
     const firstItem = items[0];
     setRecordItems([...recordItems, { 
       itemId: firstItem?.id.toString() || "", 
       quantity: 1, 
-      originalPrice: firstItem?.originalPrice?.toString() || "", // 🌟 自動帶入原價
+      originalPrice: firstItem?.originalPrice?.toString() || "", 
       costPrice: "" 
     }]);
   };
@@ -111,7 +91,9 @@ const addRecordItem = () => {
     targetItems[index] = { ...targetItems[index], [field]: value };
     setEditItems(targetItems);
   };
+  
   const addEditItemRow = () => setEditItems([...editItems, { itemId: items[0]?.id.toString() || "", quantity: 1, costPrice: "" }]);
+  
   const removeEditItemRow = (index: number) => {
     if (editItems.length > 1) setEditItems(editItems.filter((_, i) => i !== index));
   };
@@ -123,8 +105,7 @@ const addRecordItem = () => {
       const res = await fetch("/api/records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...recordForm, recordItems }) });
       if (res.ok) { 
         setRecordForm({ ...recordForm, costPrice: "", pickupLocation: "" });
-        setRecordItems([{ itemId: items[0]?.id.toString() || "", quantity: 1, originalPrice: "", costPrice: "" }]);
-        setGlobalDiscount("");
+        setRecordItems([{ itemId: items[0]?.id.toString() || "", quantity: 1, originalPrice: items[0]?.originalPrice?.toString() || "", costPrice: "" }]);
         setIsAddingRecord(false); refreshData(); 
       }
     } catch (error) { alert("❌ 連線發生錯誤"); }
@@ -201,27 +182,19 @@ const addRecordItem = () => {
                   </div>
                   <div className="w-[30%] md:w-24"><input type="number" placeholder="原價" value={rItem.originalPrice} onChange={(e) => updateRecordItem(index, 'originalPrice', e.target.value)} className="w-full border rounded-lg p-2.5 bg-gray-50 text-sm font-bold text-center" /></div>
                   <div className="w-[20%] md:w-20"><input type="number" min="1" placeholder="數量" value={rItem.quantity} onChange={(e) => updateRecordItem(index, 'quantity', Number(e.target.value))} className="w-full border rounded-lg p-2.5 bg-gray-50 text-sm font-bold text-center" required /></div>
-                  {/* 這是系統自動算出來的進貨單價，也可以手動修改 */}
                   <div className="w-[30%] md:w-24"><input type="number" placeholder="進貨價" value={rItem.costPrice} onChange={(e) => updateRecordItem(index, 'costPrice', e.target.value)} className="w-full border-2 border-orange-200 rounded-lg p-2.5 bg-orange-50 text-orange-600 text-sm font-black text-center outline-none" required /></div>
                   <div className="w-[10%] md:w-8 text-center">{recordItems.length > 1 && <button type="button" onClick={() => removeRecordItem(index)} className="text-red-400 hover:text-red-600 font-bold pb-1 px-2">X</button>}</div>
                 </div>
               ))}
             </div>
 
-            {/* 🌟 2. 智慧成本分配計算機 */}
+            {/* 🌟 2. 智慧成本分配計算機 (已精簡) */}
             <div className="bg-yellow-50 p-5 rounded-2xl border border-yellow-200">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">💡</span>
                 <h3 className="font-bold text-yellow-800 text-sm">智慧進貨單價分配 (依照最終發票金額自動算單價)</h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <div className="w-full">
-                  <label className="block text-xs font-bold text-yellow-700 mb-1">全館折扣 (選填, 例: 88)</label>
-                  <div className="flex items-center gap-2">
-                    <input type="number" value={globalDiscount} onChange={(e) => setGlobalDiscount(e.target.value)} placeholder="折數" className="w-full border rounded-xl p-2.5 bg-white text-sm font-bold text-yellow-700 outline-none" />
-                    <span className="text-sm font-bold text-yellow-700">折</span>
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <div className="w-full md:col-span-2">
                   <label className="block text-xs font-bold text-green-700 mb-1">最終結帳發票總額 (必填)</label>
                   <input type="number" value={recordForm.costPrice} onChange={(e) => setRecordForm({...recordForm, costPrice: e.target.value})} placeholder="請輸入實際付的總金額" className="w-full border-2 border-green-400 rounded-xl p-2.5 bg-white text-sm font-black text-green-600 outline-none" />
