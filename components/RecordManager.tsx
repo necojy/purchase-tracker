@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 
 type Item = { id: number; name: string; sellPrice: number; originalPrice: number; };
-type PurchaseItem = { id: number; quantity: number; costPrice: number; item: Item; itemId: number; };
+type PurchaseItem = { id: number; quantity: number; costPrice: string | number; item: Item; itemId: number; };
 type RecordType = { id: number; location: string; buyer: string; paymentMethod: string; purchaseDate: string; items: PurchaseItem[]; pickupLocation: string; isReconciled: boolean; };
 
 type Props = { items: Item[]; records: RecordType[]; refreshData: () => void; };
@@ -12,13 +12,9 @@ export default function RecordManager({ items, records, refreshData }: Props) {
   const [isAddingRecord, setIsAddingRecord] = useState(false);
   const [expandedRecordId, setExpandedRecordId] = useState<number | null>(null);
   
-  // 主單資訊 (costPrice 這裡作為「最終結帳總額」)
   const [recordForm, setRecordForm] = useState({ costPrice: "", location: "蝦皮", buyer: "洪", paymentMethod: "信用卡", pickupLocation: "" });
-  
-  // 紀錄明細 (加入 originalPrice 用來暫存店內單價)
   const [recordItems, setRecordItems] = useState([{ itemId: "", quantity: 1, originalPrice: "", costPrice: "" }]);
 
-  // 編輯表單的狀態
   const [editForm, setEditForm] = useState({ id: 0, location: "", buyer: "", paymentMethod: "", pickupLocation: "" });
   const [editItems, setEditItems] = useState([{ itemId: "", quantity: 1, costPrice: "" }]);
 
@@ -28,29 +24,34 @@ export default function RecordManager({ items, records, refreshData }: Props) {
     }
   }, [items]);
 
-  // --- 💡 核心功能：智慧分配進貨單價 (已精簡) ---
+  // 🌟 智慧演算法：保證分配後總和完美等於發票金額
   const handleAutoDistribute = () => {
-    // 1. 計算所有「店內單價 × 數量」的總原價
     const totalOrig = recordItems.reduce((sum, item) => sum + (Number(item.originalPrice) || 0) * item.quantity, 0);
+    if (totalOrig === 0) { alert("❌ 請先填寫各商品的「店內單價」與「數量」！"); return; }
     
-    if (totalOrig === 0) {
-      alert("❌ 請先填寫各商品的「店內單價」與「數量」！");
-      return;
-    }
-
     const finalTotal = Number(recordForm.costPrice);
+    if (!finalTotal) { alert("❌ 請輸入「最終結帳發票總額」！"); return; }
 
-    if (!finalTotal) {
-      alert("❌ 請輸入「最終結帳發票總額」來進行分配！");
-      return;
-    }
+    let remainingTotal = finalTotal;
 
-    // 2. 按照比例將最終結帳總額分攤到每一個商品的「進貨單價」
-    const newItems = recordItems.map(item => {
+    const newItems = recordItems.map((item, index) => {
       const orig = Number(item.originalPrice) || 0;
-      // 分攤公式：總結帳金額 × (單一商品原價 / 總原價)
-      const unitCost = Math.round(finalTotal * (orig / totalOrig));
-      return { ...item, costPrice: unitCost > 0 ? unitCost.toString() : "" };
+      const itemTotalOrig = orig * item.quantity;
+      let rowCost = 0;
+
+      // 如果是最後一個商品，直接把剩下的金額全包，保證總和絕對不會少 1 塊！
+      if (index === recordItems.length - 1) {
+        rowCost = remainingTotal;
+      } else {
+        rowCost = Math.round(finalTotal * (itemTotalOrig / totalOrig));
+        remainingTotal -= rowCost;
+      }
+
+      // 算出帶有小數點的精準單價 (保留兩位小數)
+      const unitCost = rowCost / item.quantity;
+      const displayUnitCost = Number(unitCost.toFixed(2));
+
+      return { ...item, costPrice: displayUnitCost > 0 ? displayUnitCost.toString() : "" };
     });
 
     setRecordItems(newItems);
@@ -59,29 +60,20 @@ export default function RecordManager({ items, records, refreshData }: Props) {
   const updateRecordItem = (index: number, field: string, value: string | number) => {
     const newItems = [...recordItems];
     newItems[index] = { ...newItems[index], [field]: value };
-
-    // 🌟 當使用者切換「選擇商品」時，自動帶入該商品的常用原價
     if (field === 'itemId') {
       const selectedItem = items.find(i => i.id.toString() === value);
       if (selectedItem) {
-        newItems[index].originalPrice = selectedItem.originalPrice ? selectedItem.originalPrice.toString() : "";
-        newItems[index].costPrice = ""; // 清空進貨單價，讓使用者重新跑自動計算
+        newItems[index].originalPrice = selectedItem.originalPrice?.toString() || "";
+        newItems[index].costPrice = ""; 
       }
     }
-    
     setRecordItems(newItems);
   };
 
   const addRecordItem = () => {
     const firstItem = items[0];
-    setRecordItems([...recordItems, { 
-      itemId: firstItem?.id.toString() || "", 
-      quantity: 1, 
-      originalPrice: firstItem?.originalPrice?.toString() || "", 
-      costPrice: "" 
-    }]);
+    setRecordItems([...recordItems, { itemId: firstItem?.id.toString() || "", quantity: 1, originalPrice: firstItem?.originalPrice?.toString() || "", costPrice: "" }]);
   };
-
   const removeRecordItem = (index: number) => {
     if (recordItems.length > 1) setRecordItems(recordItems.filter((_, i) => i !== index));
   };
@@ -91,16 +83,14 @@ export default function RecordManager({ items, records, refreshData }: Props) {
     targetItems[index] = { ...targetItems[index], [field]: value };
     setEditItems(targetItems);
   };
-  
   const addEditItemRow = () => setEditItems([...editItems, { itemId: items[0]?.id.toString() || "", quantity: 1, costPrice: "" }]);
-  
   const removeEditItemRow = (index: number) => {
     if (editItems.length > 1) setEditItems(editItems.filter((_, i) => i !== index));
   };
 
   const handleAddRecord = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (recordItems.some(i => i.costPrice === "")) { alert("❌ 請填寫或產生所有商品的進貨單價"); return; }
+    if (recordItems.some(i => i.costPrice === "")) { alert("❌ 請點擊自動分配按鈕，或手動填寫進貨價"); return; }
     try {
       const res = await fetch("/api/records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...recordForm, recordItems }) });
       if (res.ok) { 
@@ -112,9 +102,8 @@ export default function RecordManager({ items, records, refreshData }: Props) {
   };
 
   const toggleExpand = (record: RecordType) => {
-    if (expandedRecordId === record.id) {
-      setExpandedRecordId(null);
-    } else {
+    if (expandedRecordId === record.id) setExpandedRecordId(null);
+    else {
       setExpandedRecordId(record.id);
       setEditForm({ id: record.id, location: record.location, buyer: record.buyer, paymentMethod: record.paymentMethod || "貨到付款", pickupLocation: record.pickupLocation || "" });
       setEditItems(record.items.map(i => ({ itemId: i.itemId.toString(), quantity: i.quantity, costPrice: i.costPrice.toString() })));
@@ -126,21 +115,16 @@ export default function RecordManager({ items, records, refreshData }: Props) {
     await fetch("/api/records", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...editForm, recordItems: editItems }) });
     setExpandedRecordId(null); refreshData();
   };
-
   const handleDeleteRecord = async (id: number) => {
     if (!confirm("確定要刪除這筆紀錄嗎？")) return;
     await fetch("/api/records", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
     setExpandedRecordId(null); refreshData();
   };
-
   const handleToggleReconcile = async (id: number, currentStatus: boolean, e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation(); 
     await fetch("/api/records", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, isReconciled: !currentStatus }) });
     refreshData();
   };
-
-  // 即時計算驗證總額 (看分配後有沒有差 1 塊錢)
-  const currentTotalCost = recordItems.reduce((sum, item) => sum + (Number(item.costPrice) || 0) * item.quantity, 0);
 
   return (
     <div>
@@ -152,7 +136,6 @@ export default function RecordManager({ items, records, refreshData }: Props) {
       {isAddingRecord && (
         <div className="bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-gray-100 mb-4 animate-fade-in">
           <form onSubmit={handleAddRecord} className="space-y-5">
-            
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <div className="w-full"><label className="block text-sm text-gray-500 mb-1">購買人</label><select value={recordForm.buyer} onChange={(e) => setRecordForm({...recordForm, buyer: e.target.value})} className="w-full border rounded-xl p-3 bg-gray-50"><option>洪</option><option>雅</option><option>宥</option><option>崑</option></select></div>
               <div className="w-full"><label className="block text-sm text-gray-500 mb-1">購買地方</label><select value={recordForm.location} onChange={(e) => setRecordForm({...recordForm, location: e.target.value})} className="w-full border rounded-xl p-3 bg-gray-50"><option>蝦皮</option><option>屈臣氏</option></select></div>
@@ -160,13 +143,11 @@ export default function RecordManager({ items, records, refreshData }: Props) {
               <div className="w-full"><label className="block text-sm text-gray-500 mb-1">取貨地點</label><input type="text" value={recordForm.pickupLocation} onChange={(e) => setRecordForm({...recordForm, pickupLocation: e.target.value})} className="w-full border rounded-xl p-3 bg-gray-50" placeholder="地點" /></div>
             </div>
 
-            {/* 🌟 1. 商品明細輸入區 */}
             <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-3">
               <div className="flex justify-between items-center mb-1">
                 <h3 className="font-bold text-gray-700 text-sm">🛒 購買品項清單</h3>
                 <button type="button" onClick={addRecordItem} className="text-blue-600 font-bold text-sm hover:text-blue-800 bg-white px-3 py-1.5 rounded-lg shadow-sm border">+ 加入商品</button>
               </div>
-              
               <div className="flex text-xs font-bold text-gray-400 px-2 hidden md:flex">
                 <div className="flex-1">商品名稱</div>
                 <div className="w-24 text-center">店內單價</div>
@@ -174,48 +155,34 @@ export default function RecordManager({ items, records, refreshData }: Props) {
                 <div className="w-24 text-center text-orange-400">折後進貨價</div>
                 <div className="w-8"></div>
               </div>
-
               {recordItems.map((rItem, index) => (
                 <div key={index} className="flex flex-wrap md:flex-nowrap gap-2 items-center bg-white p-2 rounded-xl shadow-sm border border-gray-100">
-                  <div className="w-full md:flex-1">
-                    <select value={rItem.itemId} onChange={(e) => updateRecordItem(index, 'itemId', e.target.value)} className="w-full border rounded-lg p-2.5 bg-gray-50 text-sm font-bold text-gray-700 outline-none">{items.map(item => <option key={item.id} value={item.id}>{item.name} (${item.sellPrice})</option>)}</select>
-                  </div>
+                  <div className="w-full md:flex-1"><select value={rItem.itemId} onChange={(e) => updateRecordItem(index, 'itemId', e.target.value)} className="w-full border rounded-lg p-2.5 bg-gray-50 text-sm font-bold text-gray-700 outline-none">{items.map(item => <option key={item.id} value={item.id}>{item.name} (${item.sellPrice})</option>)}</select></div>
                   <div className="w-[30%] md:w-24"><input type="number" placeholder="原價" value={rItem.originalPrice} onChange={(e) => updateRecordItem(index, 'originalPrice', e.target.value)} className="w-full border rounded-lg p-2.5 bg-gray-50 text-sm font-bold text-center" /></div>
                   <div className="w-[20%] md:w-20"><input type="number" min="1" placeholder="數量" value={rItem.quantity} onChange={(e) => updateRecordItem(index, 'quantity', Number(e.target.value))} className="w-full border rounded-lg p-2.5 bg-gray-50 text-sm font-bold text-center" required /></div>
-                  <div className="w-[30%] md:w-24"><input type="number" placeholder="進貨價" value={rItem.costPrice} onChange={(e) => updateRecordItem(index, 'costPrice', e.target.value)} className="w-full border-2 border-orange-200 rounded-lg p-2.5 bg-orange-50 text-orange-600 text-sm font-black text-center outline-none" required /></div>
+                  <div className="w-[30%] md:w-24"><input type="number" step="0.01" placeholder="進貨價" value={rItem.costPrice} onChange={(e) => updateRecordItem(index, 'costPrice', e.target.value)} className="w-full border-2 border-orange-200 rounded-lg p-2.5 bg-orange-50 text-orange-600 text-sm font-black text-center outline-none" required /></div>
                   <div className="w-[10%] md:w-8 text-center">{recordItems.length > 1 && <button type="button" onClick={() => removeRecordItem(index)} className="text-red-400 hover:text-red-600 font-bold pb-1 px-2">X</button>}</div>
                 </div>
               ))}
             </div>
 
-            {/* 🌟 2. 智慧成本分配計算機 (已精簡) */}
+            {/* 🌟 煥然一新的計算機 (無打折輸入框、無警告) */}
             <div className="bg-yellow-50 p-5 rounded-2xl border border-yellow-200">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">💡</span>
                 <h3 className="font-bold text-yellow-800 text-sm">智慧進貨單價分配 (依照最終發票金額自動算單價)</h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <div className="w-full md:col-span-2">
+              <div className="flex flex-col md:flex-row gap-4 items-end">
+                <div className="w-full md:flex-1">
                   <label className="block text-xs font-bold text-green-700 mb-1">最終結帳發票總額 (必填)</label>
                   <input type="number" value={recordForm.costPrice} onChange={(e) => setRecordForm({...recordForm, costPrice: e.target.value})} placeholder="請輸入實際付的總金額" className="w-full border-2 border-green-400 rounded-xl p-2.5 bg-white text-sm font-black text-green-600 outline-none" />
                 </div>
-                <div className="w-full">
-                  <button type="button" onClick={handleAutoDistribute} className="w-full bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold py-3 rounded-xl transition shadow-sm text-sm">
+                <div className="w-full md:w-auto">
+                  <button type="button" onClick={handleAutoDistribute} className="w-full md:w-auto bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold px-6 py-3 rounded-xl transition shadow-sm text-sm whitespace-nowrap">
                     ✨ 自動分配單價
                   </button>
                 </div>
               </div>
-              
-              {/* 驗證小提示 */}
-              {currentTotalCost > 0 && (
-                <div className="mt-3 text-right">
-                  <span className="text-xs text-gray-500 font-bold mr-2">目前各項折後總和檢查：</span>
-                  <span className={`text-sm font-black ${currentTotalCost === Number(recordForm.costPrice) ? 'text-green-600' : 'text-red-500'}`}>${currentTotalCost}</span>
-                  {currentTotalCost !== Number(recordForm.costPrice) && recordForm.costPrice && (
-                    <p className="text-xs text-red-400 mt-1">※ 因四捨五入產生誤差，請手動微調某項商品的進貨價讓總和一致。</p>
-                  )}
-                </div>
-              )}
             </div>
             
             <button type="submit" className="w-full bg-[#10B981] text-white font-bold py-3.5 rounded-xl hover:bg-green-600 transition text-lg shadow-sm" disabled={items.length === 0}>送出紀錄</button>
@@ -227,14 +194,16 @@ export default function RecordManager({ items, records, refreshData }: Props) {
       <div className="space-y-4">
         {records.map((record) => {
           const safeItems = record.items || [];
-          const recordTotalCost = safeItems.reduce((sum, i) => sum + (i.costPrice || 0) * i.quantity, 0);
-          const recordTotalRevenue = safeItems.reduce((sum, i) => sum + (i.item?.sellPrice || 0) * i.quantity, 0);
+          
+          // 🌟 在列表顯示時也加上 Math.round()，保持畫面乾淨無小數點
+          const recordTotalCost = Math.round(safeItems.reduce((sum, i) => sum + (Number(i.costPrice) || 0) * i.quantity, 0));
+          const recordTotalRevenue = Math.round(safeItems.reduce((sum, i) => sum + (i.item?.sellPrice || 0) * i.quantity, 0));
           const recordTotalProfit = recordTotalRevenue - recordTotalCost;
+          
           const isExpanded = expandedRecordId === record.id;
 
           return (
             <div key={record.id} className={`bg-white rounded-[2rem] shadow-sm border overflow-hidden transition-all duration-300 ${record.isReconciled ? 'border-green-200 opacity-70 bg-green-50/30' : 'border-gray-100'} ${isExpanded ? 'ring-2 ring-blue-100' : ''}`}>
-              
               <div onClick={() => toggleExpand(record)} className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between cursor-pointer hover:bg-gray-50/50 transition gap-4 md:gap-0">
                 <div className="flex items-center gap-4 w-full md:w-[30%]">
                   <span className="text-blue-600 font-bold text-sm bg-blue-50 px-3 py-1 rounded-full">{new Date(record.purchaseDate).toISOString().split('T')[0]}</span>
@@ -280,14 +249,13 @@ export default function RecordManager({ items, records, refreshData }: Props) {
                     {editItems.map((eItem, index) => {
                       const itemData = items.find(i => i.id.toString() === eItem.itemId);
                       const sellPrice = itemData?.sellPrice || 0;
-                      const itemProfit = (sellPrice - Number(eItem.costPrice)) * eItem.quantity;
+                      // 🌟 在編輯模式也加上 Math.round()
+                      const itemProfit = Math.round((sellPrice - Number(eItem.costPrice)) * eItem.quantity);
                       
                       return (
                         <div key={index} className="flex flex-wrap md:flex-nowrap items-center gap-2 bg-white p-2 rounded-xl border border-gray-100 shadow-sm">
-                          <div className="w-full md:flex-1">
-                            <select value={eItem.itemId} onChange={(e) => handleEditItemChange(index, 'itemId', e.target.value)} className="w-full bg-gray-50 rounded-lg p-2.5 text-sm font-bold text-gray-600 outline-none">{items.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-                          </div>
-                          <div className="w-1/3 md:w-24"><input type="number" value={eItem.costPrice} onChange={(e) => handleEditItemChange(index, 'costPrice', e.target.value)} className="w-full text-center text-orange-500 font-black text-sm p-2 outline-none border rounded-lg bg-gray-50" /></div>
+                          <div className="w-full md:flex-1"><select value={eItem.itemId} onChange={(e) => handleEditItemChange(index, 'itemId', e.target.value)} className="w-full bg-gray-50 rounded-lg p-2.5 text-sm font-bold text-gray-600 outline-none">{items.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+                          <div className="w-1/3 md:w-24"><input type="number" step="0.01" value={eItem.costPrice} onChange={(e) => handleEditItemChange(index, 'costPrice', e.target.value)} className="w-full text-center text-orange-500 font-black text-sm p-2 outline-none border rounded-lg bg-gray-50" /></div>
                           <div className="w-1/3 md:w-24 text-center text-blue-500 font-black text-sm">${sellPrice}</div>
                           <div className="w-1/3 md:w-24"><input type="number" min="1" value={eItem.quantity} onChange={(e) => handleEditItemChange(index, 'quantity', Number(e.target.value))} className="w-full text-center font-black text-sm p-2 outline-none border rounded-lg bg-gray-50" /></div>
                           <div className="w-full md:w-24 text-center font-black text-sm text-gray-600">${itemProfit}</div>

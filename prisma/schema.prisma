@@ -31,6 +31,7 @@ model PurchaseRecord {
 }
 
 // 訂單明細 (🌟 加上進貨單價)
+// 訂單明細
 model PurchaseItem {
   id             Int            @id @default(autoincrement())
   recordId       Int
@@ -38,5 +39,7 @@ model PurchaseItem {
   itemId         Int
   item           Item           @relation(fields: [itemId], references: [id])
   quantity       Int            @default(1)
-  costPrice      Int            @default(0) // 🌟 每個商品的進貨單價
+  
+  // 🌟 把這裡從 Int 改成 Float，讓系統可以儲存精準的除法小數！
+  costPrice      Float          @default(0) 
 }

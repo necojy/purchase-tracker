@@ -7,22 +7,23 @@ type RecordType = { id: number; isReconciled: boolean; items: PurchaseItem[]; };
 type Props = { records: RecordType[]; };
 
 export default function Dashboard({ records }: Props) {
-  // 🌟 成本 = (各商品進貨單價 * 數量) 的加總
-  const unreconciledCost = records.filter(r => !r.isReconciled).reduce((sum, r) => {
-    const recordCost = (r.items || []).reduce((sub, i) => sub + (i.costPrice || 0) * i.quantity, 0);
+  
+  // 🌟 加上 Math.round() 確保顯示出來永遠是漂亮整數
+  const unreconciledCost = Math.round(records.filter(r => !r.isReconciled).reduce((sum, r) => {
+    const recordCost = (r.items || []).reduce((sub, i) => sub + (Number(i.costPrice) || 0) * i.quantity, 0);
     return sum + recordCost;
-  }, 0);
+  }, 0));
 
-  const unreconciledRevenue = records.filter(r => !r.isReconciled).reduce((sum, r) => {
+  const unreconciledRevenue = Math.round(records.filter(r => !r.isReconciled).reduce((sum, r) => {
     const recordRev = (r.items || []).reduce((sub, i) => sub + (i.item?.sellPrice || 0) * i.quantity, 0);
     return sum + recordRev;
-  }, 0);
+  }, 0));
 
-  const totalProfit = records.reduce((sum, r) => {
+  const totalProfit = Math.round(records.reduce((sum, r) => {
     const recordRev = (r.items || []).reduce((sub, i) => sub + (i.item?.sellPrice || 0) * i.quantity, 0);
-    const recordCost = (r.items || []).reduce((sub, i) => sub + (i.costPrice || 0) * i.quantity, 0);
+    const recordCost = (r.items || []).reduce((sub, i) => sub + (Number(i.costPrice) || 0) * i.quantity, 0);
     return sum + (recordRev - recordCost);
-  }, 0);
+  }, 0));
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-2">
