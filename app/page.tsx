@@ -8,16 +8,7 @@ import Dashboard from "@/components/Dashboard";
 // 🌟 字典更新：加上 originalPrice
 type Item = { id: number; name: string; sellPrice: number; originalPrice: number; };
 type PurchaseItem = { id: number; quantity: number; costPrice: number; item: Item; itemId: number; };
-type RecordType = { 
-  id: number; 
-  location: string; 
-  buyer: string; 
-  paymentMethod: string; 
-  purchaseDate: string; 
-  pickupLocation: string; 
-  isReconciled: boolean; 
-  items: PurchaseItem[]; 
-};
+type RecordType = { id: number; location: string; buyer: string; paymentMethod: string; purchaseDate: string; pickupLocation: string; isReconciled: boolean; isRefunded: boolean; items: PurchaseItem[]; };
 
 export default function Home() {
   const [items, setItems] = useState<Item[]>([]);

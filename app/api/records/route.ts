@@ -29,7 +29,7 @@ export async function POST(request: Request) {
           create: data.recordItems.map((item: any) => ({
             itemId: Number(item.itemId),
             quantity: Number(item.quantity),
-            costPrice: Number(item.costPrice) // 🌟 存入單價
+            costPrice: Number(item.costPrice)
           }))
         }
       },
@@ -44,22 +44,26 @@ export async function PUT(request: Request) {
   try {
     const data = await request.json();
     
-    // 如果只有傳 isReconciled，代表只是切換對帳狀態
-    if (Object.keys(data).length === 2 && data.isReconciled !== undefined) {
+    // 🌟 如果沒有傳入 recordItems，代表只是「快速切換狀態 (對帳 或 退款)」
+    if (!data.recordItems) {
       const updated = await prisma.purchaseRecord.update({
-        where: { id: data.id }, data: { isReconciled: data.isReconciled },
+        where: { id: data.id }, 
+        data: { 
+          ...(data.isReconciled !== undefined && { isReconciled: data.isReconciled }),
+          ...(data.isRefunded !== undefined && { isRefunded: data.isRefunded })
+        },
       });
       return NextResponse.json(updated, { status: 200 });
     }
 
-    // 🌟 否則就是「完整編輯」：更新主單，並刪除舊明細、建立新明細
+    // 否則就是「完整編輯」
     const updatedRecord = await prisma.purchaseRecord.update({
       where: { id: data.id },
       data: {
         location: data.location, buyer: data.buyer,
         paymentMethod: data.paymentMethod, pickupLocation: data.pickupLocation,
         items: {
-          deleteMany: {}, // 先清空舊的明細
+          deleteMany: {},
           create: data.recordItems.map((item: any) => ({
             itemId: Number(item.itemId), quantity: Number(item.quantity), costPrice: Number(item.costPrice)
           }))

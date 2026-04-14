@@ -2,24 +2,25 @@
 
 type Item = { id: number; name: string; sellPrice: number; };
 type PurchaseItem = { id: number; quantity: number; costPrice: number; item: Item; };
-type RecordType = { id: number; isReconciled: boolean; items: PurchaseItem[]; };
+// 🌟 字典補上 isRefunded
+type RecordType = { id: number; isReconciled: boolean; isRefunded?: boolean; items: PurchaseItem[]; };
 
 type Props = { records: RecordType[]; };
 
 export default function Dashboard({ records }: Props) {
   
-  // 🌟 加上 Math.round() 確保顯示出來永遠是漂亮整數
-  const unreconciledCost = Math.round(records.filter(r => !r.isReconciled).reduce((sum, r) => {
+  // 🌟 過濾掉「已退款」的紀錄 (!r.isRefunded)
+  const unreconciledCost = Math.round(records.filter(r => !r.isReconciled && !r.isRefunded).reduce((sum, r) => {
     const recordCost = (r.items || []).reduce((sub, i) => sub + (Number(i.costPrice) || 0) * i.quantity, 0);
     return sum + recordCost;
   }, 0));
 
-  const unreconciledRevenue = Math.round(records.filter(r => !r.isReconciled).reduce((sum, r) => {
+  const unreconciledRevenue = Math.round(records.filter(r => !r.isReconciled && !r.isRefunded).reduce((sum, r) => {
     const recordRev = (r.items || []).reduce((sub, i) => sub + (i.item?.sellPrice || 0) * i.quantity, 0);
     return sum + recordRev;
   }, 0));
 
-  const totalProfit = Math.round(records.reduce((sum, r) => {
+  const totalProfit = Math.round(records.filter(r => !r.isRefunded).reduce((sum, r) => {
     const recordRev = (r.items || []).reduce((sub, i) => sub + (i.item?.sellPrice || 0) * i.quantity, 0);
     const recordCost = (r.items || []).reduce((sub, i) => sub + (Number(i.costPrice) || 0) * i.quantity, 0);
     return sum + (recordRev - recordCost);
@@ -36,7 +37,7 @@ export default function Dashboard({ records }: Props) {
         <p className="text-4xl font-black text-blue-600">${unreconciledRevenue}</p>
       </div>
       <div className="bg-[#10B981] text-white rounded-[2rem] p-8 shadow-md flex flex-col justify-center">
-        <p className="text-green-100 text-sm font-bold mb-2 tracking-wide">所有時間累計獲利</p>
+        <p className="text-green-100 text-sm font-bold mb-2 tracking-wide">有效訂單累計獲利</p>
         <p className="text-4xl font-black">${totalProfit}</p>
       </div>
     </div>

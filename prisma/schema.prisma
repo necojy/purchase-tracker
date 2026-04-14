@@ -18,7 +18,7 @@ model Item {
   purchaseItems PurchaseItem[] 
 }
 
-// 主訂單 (移除整筆總成本)
+// 主訂單
 model PurchaseRecord {
   id             Int            @id @default(autoincrement())
   purchaseDate   DateTime       @default(now())
@@ -27,6 +27,8 @@ model PurchaseRecord {
   paymentMethod  String         @default("貨到付款") 
   pickupLocation String   
   isReconciled   Boolean        @default(false)
+  isRefunded     Boolean        @default(false) // 🌟 新增：退款/取消標記，預設為否
+  
   items          PurchaseItem[] 
 }
 
