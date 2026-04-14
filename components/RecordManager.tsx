@@ -27,7 +27,12 @@ export default function RecordManager({ items, records, refreshData }: Props) {
 
   useEffect(() => {
     if (items.length > 0 && !recordItems[0].itemId) {
-      setRecordItems([{ itemId: items[0].id.toString(), quantity: 1, originalPrice: "", costPrice: "" }]);
+      setRecordItems([{ 
+        itemId: items[0].id.toString(), 
+        quantity: 1, 
+        originalPrice: items[0].originalPrice?.toString() || "", // 🌟 自動帶入原價
+        costPrice: "" 
+      }]);
     }
   }, [items]);
 
@@ -68,10 +73,35 @@ export default function RecordManager({ items, records, refreshData }: Props) {
   const updateRecordItem = (index: number, field: string, value: string | number) => {
     const newItems = [...recordItems];
     newItems[index] = { ...newItems[index], [field]: value };
+
+    // 🌟 當使用者切換「選擇商品」時，自動帶入該商品的常用原價
+    if (field === 'itemId') {
+      const selectedItem = items.find(i => i.id.toString() === value);
+      if (selectedItem) {
+        newItems[index].originalPrice = selectedItem.originalPrice ? selectedItem.originalPrice.toString() : "";
+        newItems[index].costPrice = ""; // 清空進貨單價，讓使用者重新跑自動計算
+      }
+    }
+    // 當輸入「店內原價」時，自動依據目前的折扣算出「進貨單價」
+    else if (field === 'originalPrice') {
+      const orig = Number(value) || 0;
+      const disc = globalDiscount === "" ? 100 : Number(globalDiscount);
+      newItems[index].costPrice = orig > 0 ? Math.round(orig * (disc / 100)).toString() : "";
+    }
+    
     setRecordItems(newItems);
   };
 
-  const addRecordItem = () => setRecordItems([...recordItems, { itemId: items[0]?.id.toString() || "", quantity: 1, originalPrice: "", costPrice: "" }]);
+const addRecordItem = () => {
+    const firstItem = items[0];
+    setRecordItems([...recordItems, { 
+      itemId: firstItem?.id.toString() || "", 
+      quantity: 1, 
+      originalPrice: firstItem?.originalPrice?.toString() || "", // 🌟 自動帶入原價
+      costPrice: "" 
+    }]);
+  };
+
   const removeRecordItem = (index: number) => {
     if (recordItems.length > 1) setRecordItems(recordItems.filter((_, i) => i !== index));
   };

@@ -11,7 +11,10 @@ datasource db {
 model Item {
   id            Int            @id @default(autoincrement())
   name          String
-  sellPrice     Int            
+  sellPrice     Int            // 售出價格
+  originalPrice Int            @default(0) // 🌟 新增：常用店內原價
+  
+  // 關聯的對象
   purchaseItems PurchaseItem[] 
 }
 

@@ -5,8 +5,8 @@ import ItemManager from "@/components/ItemManager";
 import RecordManager from "@/components/RecordManager";
 import Dashboard from "@/components/Dashboard"; 
 
-// 🌟 更新這裡的型別字典，對齊我們最新的「一對多」資料庫架構
-type Item = { id: number; name: string; sellPrice: number; };
+// 🌟 字典更新：加上 originalPrice
+type Item = { id: number; name: string; sellPrice: number; originalPrice: number; };
 type PurchaseItem = { id: number; quantity: number; costPrice: number; item: Item; itemId: number; };
 type RecordType = { 
   id: number; 
@@ -16,7 +16,7 @@ type RecordType = {
   purchaseDate: string; 
   pickupLocation: string; 
   isReconciled: boolean; 
-  items: PurchaseItem[]; // 🌟 包含多個商品明細
+  items: PurchaseItem[]; 
 };
 
 export default function Home() {
