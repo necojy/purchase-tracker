@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-type Item = { id: number; name: string; sellPrice: number; };
+type Item = { id: number; name: string; sellPrice: number; originalPrice: number; };
 type PurchaseItem = { id: number; quantity: number; costPrice: number; item: Item; itemId: number; };
 type RecordType = { id: number; location: string; buyer: string; paymentMethod: string; purchaseDate: string; items: PurchaseItem[]; pickupLocation: string; isReconciled: boolean; };
 
