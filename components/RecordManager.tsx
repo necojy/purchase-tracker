@@ -139,7 +139,7 @@ export default function RecordManager({ items, records, refreshData }: Props) {
   const refundedRecords = records.filter(r => r.isRefunded);
 
   // 🌟 把渲染卡片的邏輯獨立成一個小元件函式，讓程式碼更簡潔
-  const renderRecordCard = (record: RecordType) => {
+ const renderRecordCard = (record: RecordType) => {
     const safeItems = record.items || [];
     const recordTotalCost = Math.round(safeItems.reduce((sum, i) => sum + (Number(i.costPrice) || 0) * i.quantity, 0));
     const recordTotalRevenue = Math.round(safeItems.reduce((sum, i) => sum + (i.item?.sellPrice || 0) * i.quantity, 0));
@@ -151,12 +151,17 @@ export default function RecordManager({ items, records, refreshData }: Props) {
       : record.isReconciled 
         ? 'border-green-200 bg-green-50/30 opacity-70' 
         : 'border-gray-100';
+    
+        // 🌟 核心修正：把日期轉換成瀏覽器當下的本地時區 (台灣 UTC+8)
+    const dateObj = new Date(record.purchaseDate);
+    const localDateString = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
 
     return (
       <div key={record.id} className={`bg-white rounded-[2rem] shadow-sm border overflow-hidden transition-all duration-300 ${cardStyle} ${isExpanded ? 'ring-2 ring-blue-100' : ''}`}>
         <div onClick={() => toggleExpand(record)} className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between cursor-pointer hover:bg-gray-50/50 transition gap-4 md:gap-0">
           <div className="flex items-center gap-4 w-full md:w-[30%]">
-            <span className="text-blue-600 font-bold text-sm bg-blue-50 px-3 py-1 rounded-full">{new Date(record.purchaseDate).toISOString().split('T')[0]}</span>
+            {/* 🌟 替換這裡，使用轉換好的本地時區日期 */}
+            <span className="text-blue-600 font-bold text-sm bg-blue-50 px-3 py-1 rounded-full">{localDateString}</span>
             <div className={`font-black text-lg flex items-center gap-2 ${(record.isReconciled || record.isRefunded) ? 'line-through text-gray-400' : ''}`}>
               {safeItems.length === 1 ? safeItems[0].item?.name : `${safeItems[0]?.item?.name || '商品'} 等 ${safeItems.length} 項`}
               {record.isRefunded && <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full no-underline">已退款</span>}
