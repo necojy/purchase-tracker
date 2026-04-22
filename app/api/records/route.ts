@@ -25,6 +25,7 @@ export async function POST(request: Request) {
         buyer: data.buyer,
         paymentMethod: data.paymentMethod,
         pickupLocation: data.pickupLocation,
+        pickupCategory: data.pickupCategory, // 🌟 這裡新增：接收並存入取貨類別 (蝦皮/超商)
         items: {
           create: data.recordItems.map((item: any) => ({
             itemId: Number(item.itemId),
@@ -44,7 +45,7 @@ export async function PUT(request: Request) {
   try {
     const data = await request.json();
     
-    // 🌟 如果沒有傳入 recordItems，代表只是「快速切換狀態 (對帳 或 退款)」
+    // 如果沒有傳入 recordItems，代表只是「快速切換狀態 (對帳 或 退款)」
     if (!data.recordItems) {
       const updated = await prisma.purchaseRecord.update({
         where: { id: data.id }, 
@@ -60,8 +61,11 @@ export async function PUT(request: Request) {
     const updatedRecord = await prisma.purchaseRecord.update({
       where: { id: data.id },
       data: {
-        location: data.location, buyer: data.buyer,
-        paymentMethod: data.paymentMethod, pickupLocation: data.pickupLocation,
+        location: data.location, 
+        buyer: data.buyer,
+        paymentMethod: data.paymentMethod, 
+        pickupLocation: data.pickupLocation,
+        pickupCategory: data.pickupCategory, // 🌟 這裡新增：編輯時也能更新取貨類別
         items: {
           deleteMany: {},
           create: data.recordItems.map((item: any) => ({

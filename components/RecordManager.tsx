@@ -7,10 +7,10 @@ import RecordCard from "./RecordCard";
 type Item = { id: number; name: string; sellPrice: number; originalPrice: number; };
 type PurchaseItem = { id: number; quantity: number; costPrice: string | number; item: Item; itemId: number; };
 type RecordType = { id: number; location: string; buyer: string; paymentMethod: string; purchaseDate: string; items: PurchaseItem[]; pickupLocation: string; isReconciled: boolean; isRefunded: boolean; };
+type Store = { id: number; name: string; category: string; };
+type Props = { items: Item[]; records: RecordType[]; stores: Store[]; refreshData: () => void; };
 
-type Props = { items: Item[]; records: RecordType[]; refreshData: () => void; };
-
-export default function RecordManager({ items, records, refreshData }: Props) {
+export default function RecordManager({ items, records, stores, refreshData }: Props) {
   const [isAddingRecord, setIsAddingRecord] = useState(false);
   const [filterBuyer, setFilterBuyer] = useState("全部");
   const [showReconciled, setShowReconciled] = useState(false);
@@ -88,10 +88,10 @@ export default function RecordManager({ items, records, refreshData }: Props) {
         </button>
       </div>
 
+      
       {isAddingRecord && (
-        <RecordForm items={items} refreshData={refreshData} onClose={() => setIsAddingRecord(false)} />
-      )}
-
+  <RecordForm items={items} records={records} stores={stores} refreshData={refreshData} onClose={() => setIsAddingRecord(false)} />
+)}
       {/* 進行中紀錄 */}
       <div className="mt-4">
         {activeRecords.length === 0 ? (

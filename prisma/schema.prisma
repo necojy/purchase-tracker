@@ -25,10 +25,13 @@ model PurchaseRecord {
   location       String   
   buyer          String   
   paymentMethod  String         @default("貨到付款") 
-  pickupLocation String   
-  isReconciled   Boolean        @default(false)
-  isRefunded     Boolean        @default(false) // 🌟 新增：退款/取消標記，預設為否
+  pickupLocation String         // 店名 (例如: 全家神農店)
   
+  // 🌟 新增：取貨類別 (SHP: 蝦皮, CVS: 超商)
+  pickupCategory String         @default("SHP") 
+  
+  isReconciled   Boolean        @default(false)
+  isRefunded     Boolean        @default(false)
   items          PurchaseItem[] 
 }
 
@@ -44,4 +47,10 @@ model PurchaseItem {
   
   // 🌟 把這裡從 Int 改成 Float，讓系統可以儲存精準的除法小數！
   costPrice      Float          @default(0) 
+}
+
+model Store {
+  id       Int    @id @default(autoincrement())
+  name     String
+  category String @default("SHP") // SHP: 蝦皮, CVS: 超商
 }
