@@ -20,6 +20,13 @@ export default function RecordForm({ items, stores, refreshData, onClose }: Prop
       setRecordItems([{ itemId: items[0].id.toString(), quantity: 1, originalPrice: items[0].originalPrice?.toString() || "", costPrice: "" }]);
     }
   }, [items]);
+// 🌟 新增：自動將取貨店名「真正」綁定為清單上的第一間店
+  useEffect(() => {
+    const currentCategoryStores = stores.filter(s => s.category === recordForm.pickupCategory);
+    if (!recordForm.pickupLocation && currentCategoryStores.length > 0) {
+      setRecordForm(prev => ({ ...prev, pickupLocation: currentCategoryStores[0].name }));
+    }
+  }, [stores, recordForm.pickupCategory, recordForm.pickupLocation]);
 
   // 🌟 當切換「蝦皮/超商」時，自動把店名選項重置為該類別的第一間店
   const handleCategoryChange = (cat: string) => {
