@@ -6,6 +6,7 @@ import StoreManager from "@/components/StoreManager"; // 🌟 引入 StoreManage
 import RecordManager from "@/components/RecordManager";
 import Dashboard from "@/components/Dashboard"; 
 import PickupStats from "@/components/PickupStats";
+import Link from "next/link"; // 🌟 新增這一行
 
 type Item = { id: number; name: string; sellPrice: number; originalPrice: number; };
 type Store = { id: number; name: string; category: string; }; // 🌟 字典補上 Store
@@ -38,6 +39,14 @@ export default function Home() {
   return (
     <main className="min-h-screen p-8 bg-[#F4F6F8] font-sans text-gray-800">
       <div className="max-w-6xl mx-auto space-y-6">
+
+        {/* 🌟 加上這顆前往統計頁面的按鈕 */}
+        <div className="flex justify-end mb-2">
+          <Link href="/statistics" className="bg-orange-100 hover:bg-orange-200 text-orange-700 font-bold py-2 px-5 rounded-full transition shadow-sm flex items-center gap-2">
+            📊 蝦皮單日購買分析
+          </Link>
+        </div>
+        
         <Dashboard records={records} />
         <PickupStats records={records} />
         
