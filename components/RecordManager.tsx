@@ -8,17 +8,29 @@ type Item = { id: number; name: string; sellPrice: number; originalPrice: number
 type PurchaseItem = { id: number; quantity: number; costPrice: string | number; item: Item; itemId: number; };
 type RecordType = { id: number; location: string; buyer: string; paymentMethod: string; purchaseDate: string; items: PurchaseItem[]; pickupLocation: string; isReconciled: boolean; isRefunded: boolean; };
 type Store = { id: number; name: string; category: string; };
-type Props = { items: Item[]; records: RecordType[]; stores: Store[]; refreshData: () => void; };
+type Props = { 
+  items: Item[]; records: RecordType[]; stores: Store[]; refreshData: () => void; 
+  targetStore: string | null; setTargetStore: (store: string | null) => void; // 🌟 接收狀態
+};
 
-export default function RecordManager({ items, records, stores, refreshData }: Props) {
+export default function RecordManager({ items, records, stores, refreshData, targetStore, setTargetStore }: Props) {
   const [isAddingRecord, setIsAddingRecord] = useState(false);
   const [filterBuyer, setFilterBuyer] = useState("全部");
   const [showReconciled, setShowReconciled] = useState(false);
   const [showRefunded, setShowRefunded] = useState(false);
 
   // 1. 基本過濾邏輯
-  const filteredRecords = filterBuyer === "全部" ? records : records.filter(r => r.buyer === filterBuyer);
+  // 🌟 1. 雙重過濾邏輯 (人員篩選 + 店鋪點擊篩選)
+  let filteredRecords = records;
+  if (filterBuyer !== "全部") {
+    filteredRecords = filteredRecords.filter(r => r.buyer === filterBuyer);
+  }
+  if (targetStore) {
+    filteredRecords = filteredRecords.filter(r => r.pickupLocation === targetStore);
+  }
+
   const activeRecords = filteredRecords.filter(r => !r.isRefunded && !r.isReconciled);
+  
   const reconciledRecords = filteredRecords.filter(r => !r.isRefunded && r.isReconciled);
   const refundedRecords = filteredRecords.filter(r => r.isRefunded);
 
@@ -65,7 +77,7 @@ export default function RecordManager({ items, records, stores, refreshData }: P
   };
 
   return (
-    <div>
+    <div id="record-manager-section" className="scroll-mt-8">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 mt-8 gap-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full xl:w-auto">
           <h1 className="text-2xl font-black tracking-wide flex items-center gap-2 shrink-0">購買與獲利紀錄 🧾</h1>
@@ -82,6 +94,15 @@ export default function RecordManager({ items, records, stores, refreshData }: P
               </button>
             ))}
           </div>
+          {/* 🌟 新增：如果有點擊特定店鋪，這裡會出現取消篩選的按鈕 */}
+          {targetStore && (
+            <button 
+              onClick={() => setTargetStore(null)}
+              className="ml-0 sm:ml-4 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-2 transition animate-fade-in shadow-sm"
+            >
+              📍 篩選：{targetStore} ✕
+            </button>
+          )}
         </div>
         <button onClick={() => setIsAddingRecord(!isAddingRecord)} className="w-full xl:w-auto bg-[#1C4ED8] hover:bg-blue-700 text-white font-bold py-3 sm:py-2 px-5 rounded-full shadow-md transition text-center shrink-0">
           + 開始新紀錄
