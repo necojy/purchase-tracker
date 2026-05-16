@@ -21,7 +21,8 @@ export async function POST(request: Request) {
       data: {
         name: data.name,
         sellPrice: Number(data.sellPrice),
-        originalPrice: Number(data.originalPrice) || 0, // 🌟 接收原價
+        originalPrice: Number(data.originalPrice) || 0, 
+        maxQuantity: Number(data.maxQuantity) || 12, // 🌟 新增：儲存數量上限
       },
     });
     return NextResponse.json(newItem, { status: 201 });
@@ -39,7 +40,8 @@ export async function PUT(request: Request) {
       data: {
         name: data.name,
         sellPrice: Number(data.sellPrice),
-        originalPrice: Number(data.originalPrice) || 0, // 🌟 修改原價
+        originalPrice: Number(data.originalPrice) || 0, 
+        maxQuantity: Number(data.maxQuantity) || 12, // 🌟 新增：編輯時也能更新數量上限
       },
     });
     return NextResponse.json(updatedItem, { status: 200 });

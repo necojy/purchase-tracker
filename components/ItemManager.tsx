@@ -2,32 +2,34 @@
 
 import { useState } from "react";
 
-type Item = { id: number; name: string; sellPrice: number; originalPrice: number; };
+// 🌟 字典補上 maxQuantity
+type Item = { id: number; name: string; sellPrice: number; originalPrice: number; maxQuantity: number; };
 
 type Props = { items: Item[]; refreshData: () => void; };
 
 export default function ItemManager({ items, refreshData }: Props) {
-  // 🌟 新增：控制清單是否展開的狀態 (預設 false 收起，節省空間)
   const [isListExpanded, setIsListExpanded] = useState(false); 
   
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [newItemPrice, setNewItemPrice] = useState("");
   const [newOriginalPrice, setNewOriginalPrice] = useState("");
+  const [newMaxQuantity, setNewMaxQuantity] = useState("12"); // 🌟 新增狀態：預設給 12
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editOriginalPrice, setEditOriginalPrice] = useState("");
+  const [editMaxQuantity, setEditMaxQuantity] = useState(""); // 🌟 編輯用的狀態
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItemName || !newItemPrice || !newOriginalPrice) return;
     await fetch("/api/items", { 
       method: "POST", headers: { "Content-Type": "application/json" }, 
-      body: JSON.stringify({ name: newItemName, sellPrice: newItemPrice, originalPrice: newOriginalPrice }) 
+      body: JSON.stringify({ name: newItemName, sellPrice: newItemPrice, originalPrice: newOriginalPrice, maxQuantity: newMaxQuantity }) 
     });
-    setNewItemName(""); setNewItemPrice(""); setNewOriginalPrice(""); setIsAddingItem(false); 
+    setNewItemName(""); setNewItemPrice(""); setNewOriginalPrice(""); setNewMaxQuantity("12"); setIsAddingItem(false); 
     refreshData();
   };
 
@@ -40,12 +42,13 @@ export default function ItemManager({ items, refreshData }: Props) {
   const startEdit = (item: Item) => { 
     setEditingId(item.id); setEditName(item.name); 
     setEditPrice(item.sellPrice.toString()); setEditOriginalPrice(item.originalPrice?.toString() || "0"); 
+    setEditMaxQuantity(item.maxQuantity?.toString() || "12");
   };
   
   const handleSaveEdit = async (id: number) => {
     await fetch("/api/items", { 
       method: "PUT", headers: { "Content-Type": "application/json" }, 
-      body: JSON.stringify({ id, name: editName, sellPrice: editPrice, originalPrice: editOriginalPrice }) 
+      body: JSON.stringify({ id, name: editName, sellPrice: editPrice, originalPrice: editOriginalPrice, maxQuantity: editMaxQuantity }) 
     });
     setEditingId(null); refreshData();
   };
@@ -53,7 +56,6 @@ export default function ItemManager({ items, refreshData }: Props) {
   return (
     <div className="bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-gray-100">
       
-      {/* 🌟 標題區塊改為可點擊收合 */}
       <div 
         className="flex flex-wrap justify-between items-center cursor-pointer group" 
         onClick={() => setIsListExpanded(!isListExpanded)}
@@ -65,8 +67,8 @@ export default function ItemManager({ items, refreshData }: Props) {
         
         <button 
           onClick={(e) => {
-            e.stopPropagation(); // 避免點擊按鈕時觸發外層的收合
-            if (!isListExpanded) setIsListExpanded(true); // 🌟 點擊新增時，強制展開清單
+            e.stopPropagation(); 
+            if (!isListExpanded) setIsListExpanded(true); 
             setIsAddingItem(!isAddingItem);
           }} 
           className="text-blue-600 font-bold text-sm hover:text-blue-700 transition w-full sm:w-auto text-right sm:text-left mt-2 sm:mt-0"
@@ -75,7 +77,6 @@ export default function ItemManager({ items, refreshData }: Props) {
         </button>
       </div>
       
-      {/* 🌟 展開內容區：被包裹在 isListExpanded 裡面 */}
       {isListExpanded && (
         <div className="mt-5 animate-fade-in border-t border-gray-50 pt-5">
           {isAddingItem && (
@@ -83,6 +84,8 @@ export default function ItemManager({ items, refreshData }: Props) {
               <input type="text" placeholder="商品名稱" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} className="w-full sm:flex-1 px-3 py-2 rounded-lg border outline-none" required />
               <input type="number" placeholder="常用原價" value={newOriginalPrice} onChange={(e) => setNewOriginalPrice(e.target.value)} className="w-full sm:w-28 px-3 py-2 rounded-lg border outline-none text-orange-600 font-bold" required />
               <input type="number" placeholder="預期售價" value={newItemPrice} onChange={(e) => setNewItemPrice(e.target.value)} className="w-full sm:w-28 px-3 py-2 rounded-lg border outline-none text-blue-600 font-bold" required />
+              {/* 🌟 新增上限輸入框 */}
+              <input type="number" placeholder="上限" value={newMaxQuantity} onChange={(e) => setNewMaxQuantity(e.target.value)} className="w-full sm:w-20 px-3 py-2 rounded-lg border outline-none text-purple-600 font-bold" required title="最高購買數量" />
               <button type="submit" className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg font-bold">儲存</button>
             </form>
           )}
@@ -95,6 +98,8 @@ export default function ItemManager({ items, refreshData }: Props) {
                     <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full sm:w-24 px-2 py-1 rounded border text-sm" />
                     <input type="number" placeholder="原價" value={editOriginalPrice} onChange={(e) => setEditOriginalPrice(e.target.value)} className="w-full sm:w-16 px-2 py-1 rounded border text-sm text-orange-600 font-bold" />
                     <input type="number" placeholder="售價" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className="w-full sm:w-16 px-2 py-1 rounded border text-sm text-blue-600 font-bold" />
+                    {/* 🌟 編輯模式的上限輸入框 */}
+                    <input type="number" placeholder="上限" value={editMaxQuantity} onChange={(e) => setEditMaxQuantity(e.target.value)} className="w-full sm:w-16 px-2 py-1 rounded border text-sm text-purple-600 font-bold" />
                     <div className="flex gap-2 w-full sm:w-auto justify-end">
                       <button onClick={() => handleSaveEdit(item.id)} className="text-green-600 text-sm font-bold bg-green-50 px-2 py-1 rounded">完成</button>
                       <button onClick={() => setEditingId(null)} className="text-gray-400 text-sm bg-gray-100 px-2 py-1 rounded">取消</button>
@@ -107,6 +112,8 @@ export default function ItemManager({ items, refreshData }: Props) {
                       <div className="flex gap-2 text-sm">
                         <span className="text-orange-500 font-bold bg-orange-50 px-1.5 rounded">原${item.originalPrice || 0}</span>
                         <span className="text-blue-600 font-bold bg-blue-50 px-1.5 rounded">售${item.sellPrice}</span>
+                        {/* 🌟 顯示上限數量 */}
+                        <span className="text-purple-600 font-bold bg-purple-50 px-1.5 rounded">限{item.maxQuantity}件</span>
                       </div>
                     </div>
                     <div className="flex sm:hidden group-hover:flex gap-2 ml-2 sm:ml-1">

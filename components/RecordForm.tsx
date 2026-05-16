@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-type Item = { id: number; name: string; sellPrice: number; originalPrice: number; };
+type Item = { id: number; name: string; sellPrice: number; originalPrice: number; maxQuantity: number; };
 type Store = { id: number; name: string; category: string; }; // 🌟 字典補上 Store
 type RecordType = { id: number; pickupLocation: string; purchaseDate: string; }; 
 type Props = { items: Item[]; records: RecordType[]; stores: Store[]; refreshData: () => void; onClose: () => void; };

@@ -8,7 +8,7 @@ import RecordManager from "@/components/RecordManager";
 import Dashboard from "@/components/Dashboard"; 
 import PickupStats from "@/components/PickupStats";
 
-type Item = { id: number; name: string; sellPrice: number; originalPrice: number; };
+type Item = { id: number; name: string; sellPrice: number; originalPrice: number; maxQuantity: number; };
 type Store = { id: number; name: string; category: string; }; 
 type PurchaseItem = { id: number; quantity: number; costPrice: number; item: Item; itemId: number; };
 type RecordType = { id: number; location: string; buyer: string; paymentMethod: string; purchaseDate: string; pickupLocation: string; pickupCategory: string; isReconciled: boolean; isRefunded: boolean; items: PurchaseItem[]; };
@@ -43,7 +43,13 @@ export default function Home() {
     <main className="min-h-screen p-8 bg-[#F4F6F8] font-sans text-gray-800">
       <div className="max-w-6xl mx-auto space-y-6">
         
-        <div className="flex justify-end mb-2">
+        {/* 按鈕導覽列 */}
+        <div className="flex justify-end gap-3 mb-2">
+          {/* 🌟 新增：前往最優惠智慧湊單計算頁面的按鈕 */}
+          <Link href="/optimizer" className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold py-2 px-5 rounded-full transition shadow-sm flex items-center gap-2">
+            ✨ 滿額最優惠湊單計算
+          </Link>
+          
           <Link href="/statistics" className="bg-orange-100 hover:bg-orange-200 text-orange-700 font-bold py-2 px-5 rounded-full transition shadow-sm flex items-center gap-2">
             📊 蝦皮單日購買分析
           </Link>

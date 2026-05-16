@@ -4,7 +4,7 @@ import { useState } from "react";
 import RecordForm from "./RecordForm"; 
 import RecordCard from "./RecordCard"; 
 
-type Item = { id: number; name: string; sellPrice: number; originalPrice: number; };
+type Item = { id: number; name: string; sellPrice: number; originalPrice: number; maxQuantity: number; };
 type PurchaseItem = { id: number; quantity: number; costPrice: string | number; item: Item; itemId: number; };
 type RecordType = { id: number; location: string; buyer: string; paymentMethod: string; purchaseDate: string; items: PurchaseItem[]; pickupLocation: string; isReconciled: boolean; isRefunded: boolean; };
 type Store = { id: number; name: string; category: string; };
