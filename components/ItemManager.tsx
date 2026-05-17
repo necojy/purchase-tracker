@@ -33,9 +33,18 @@ export default function ItemManager({ items, refreshData }: Props) {
     refreshData();
   };
 
-  const handleDeleteItem = async (id: number) => {
-    if (!confirm("確定刪除此商品？")) return;
-    await fetch("/api/items", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+const handleDeleteItem = async (id: number) => {
+    if (!confirm("確定刪除此商品？\n(注意：如果此商品已經有購買紀錄，將無法直接刪除！)")) return;
+    
+    const res = await fetch("/api/items", { 
+      method: "DELETE", 
+      headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify({ id }) 
+    });
+
+    if (!res.ok) {
+      alert("❌ 刪除失敗！\n\n原因：這個商品已經被記錄在下方的「購買紀錄」中了。\n為保護記帳資料完整，系統禁止刪除已使用的商品。\n\n💡 建議做法：請先刪除包含此商品的紀錄，或是點擊編輯將商品改名為「(停用)」。");
+    }
     refreshData();
   };
 

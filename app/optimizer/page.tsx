@@ -19,9 +19,9 @@ export default function OptimizerPage() {
   // 使用者輸入參數
   const [targetAmount, setTargetAmount] = useState<string>("1000"); // 目標金額
   const [maxTolerance, setMaxTolerance] = useState<string>("200");   // 允許超出的上限範圍
-  const [discountPercent, setDiscountPercent] = useState<string>("100"); // 🌟 新增：折扣百分比 (例如 88 折輸入 88)
+  const [discountPercent, setDiscountPercent] = useState<string>("100"); // 折扣百分比
   
-  // 記錄哪些商品要參與湊單 (預設全選)
+  // 記錄哪些商品要參與湊單 (預設空集合，等資料載入後判定)
   const [selectedItemIds, setSelectedItemIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
@@ -32,7 +32,18 @@ export default function OptimizerPage() {
           const data = await res.json();
           const itemsData = Array.isArray(data) ? data : [];
           setItems(itemsData);
-          setSelectedItemIds(new Set(itemsData.map(i => i.id)));
+          
+          // 🌟 1. 載入商品時，讀取瀏覽器中記憶的勾選狀態
+          const savedSelection = localStorage.getItem("optimizerSelectedItems");
+          if (savedSelection) {
+            const parsedIds = JSON.parse(savedSelection);
+            // 防呆：確保記憶裡的 ID 現在還真的存在於資料庫中（避免商品已刪除但還記著）
+            const validIds = parsedIds.filter((id: number) => itemsData.some(i => i.id === id));
+            setSelectedItemIds(new Set(validIds));
+          } else {
+            // 如果從來沒設定過，預設還是全部勾選
+            setSelectedItemIds(new Set(itemsData.map(i => i.id)));
+          }
         }
       } catch (error) {
         console.error("讀取商品失敗", error);
@@ -42,6 +53,14 @@ export default function OptimizerPage() {
     };
     fetchItems();
   }, []);
+
+  // 🌟 2. 只要勾選狀態有變動，就立刻存進瀏覽器的記憶體中
+  useEffect(() => {
+    // 確保商品有載入才存，避免一開始載入中的空狀態把記憶洗掉
+    if (items.length > 0) {
+      localStorage.setItem("optimizerSelectedItems", JSON.stringify(Array.from(selectedItemIds)));
+    }
+  }, [selectedItemIds, items]);
 
   // 切換商品勾選狀態
   const toggleItemSelect = (id: number) => {
@@ -57,8 +76,6 @@ export default function OptimizerPage() {
     else setSelectedItemIds(new Set());
   };
 
-  // 🌟 核心：完全背包演算法（智慧湊單動態規劃 - 支援先計算折後價再判定，並回傳 6 筆結果）
-// 🌟 升級版：多重背包演算法 (支援數量上限限制)
   const optimizationResults = useMemo(() => {
     const target = Number(targetAmount);
     const tolerance = Number(maxTolerance);
@@ -68,7 +85,7 @@ export default function OptimizerPage() {
     
     const maxOrigLimit = Math.ceil((target + tolerance) / pct) + 500;
     
-    const candidates = items.filter(i => selectedItemIds.has(i.id) && i.sellPrice > 0);
+    const candidates = items.filter(i => selectedItemIds.has(i.id) && i.originalPrice > 0);
     if (candidates.length === 0) return [];
 
     const dp = new Array(maxOrigLimit + 1).fill(-1);
@@ -76,20 +93,17 @@ export default function OptimizerPage() {
     
     dp[0] = 0; 
 
-    // 針對每一個候選商品進行運算
     for (const item of candidates) {
-      const price = item.sellPrice;
-      const maxQ = item.maxQuantity || 12; // 🌟 讀取數量上限，防呆預設100
+      const price = item.originalPrice; 
+      const maxQ = item.maxQuantity || 12; 
       
-      // 🌟 用來追蹤「當前商品」在各個目標金額中已經被用了幾次
       const used = new Array(maxOrigLimit + 1).fill(0);
 
       for (let v = price; v <= maxOrigLimit; v++) {
-        // 如果前一個金額是能湊出來的，且當前金額還沒被佔用，並且「這個商品還沒買超過上限」
         if (dp[v - price] !== -1 && dp[v] === -1 && used[v - price] < maxQ) {
           dp[v] = item.id;
           parent[v] = v - price;
-          used[v] = used[v - price] + 1; // 記錄使用次數 + 1
+          used[v] = used[v - price] + 1; 
         }
       }
     }
@@ -116,7 +130,7 @@ export default function OptimizerPage() {
             return {
               item,
               quantity: qty,
-              subtotal: item.sellPrice * qty
+              subtotal: item.originalPrice * qty 
             };
           });
 
@@ -138,7 +152,6 @@ export default function OptimizerPage() {
     <main className="min-h-screen p-4 sm:p-8 bg-[#F4F6F8] font-sans text-gray-800">
       <div className="max-w-6xl mx-auto space-y-6">
         
-        {/* 頂部導覽列 */}
         <div className="flex justify-between items-center bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-gray-100">
           <div className="flex items-center gap-4">
             <Link href="/" className="text-gray-400 hover:text-blue-600 font-black text-xl transition shrink-0">
@@ -150,15 +163,13 @@ export default function OptimizerPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* 左側：設定區塊與候選商品清單 */}
           <div className="lg:col-span-1 space-y-6">
             
-            {/* 條件設定卡片 */}
             <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 space-y-4">
               <h2 className="font-bold text-gray-700 text-base border-b pb-2">⚙️ 湊單條件設定</h2>
               
               <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1">目標金額 (不可低於此金額)</label>
+                <label className="block text-xs font-bold text-gray-500 mb-1">折後目標金額 (不可低於此金額)</label>
                 <input 
                   type="number" 
                   value={targetAmount} 
@@ -179,7 +190,6 @@ export default function OptimizerPage() {
                 />
               </div>
 
-              {/* 🌟 新增：折扣優惠輸入欄位 */}
               <div>
                 <label className="block text-xs font-bold text-gray-500 mb-1">折扣優惠 (例如: 88折輸入 88，不打折輸入 100)</label>
                 <input 
@@ -196,7 +206,6 @@ export default function OptimizerPage() {
               </div>
             </div>
 
-            {/* 商品挑選卡片 */}
             <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 space-y-3 max-h-[500px] flex flex-col">
               <div className="flex justify-between items-center border-b pb-2 shrink-0">
                 <h2 className="font-bold text-gray-700 text-base">🛒 參與湊單商品選項</h2>
@@ -211,7 +220,6 @@ export default function OptimizerPage() {
                 </label>
               </div>
 
-              {/* 滾動商品清單 */}
               <div className="overflow-y-auto space-y-2 flex-1 pr-1">
                 {items.map(item => (
                   <div 
@@ -228,8 +236,8 @@ export default function OptimizerPage() {
                       />
                       <span>{item.name}</span>
                     </div>
-                    <span className={selectedItemIds.has(item.id) ? 'text-indigo-600 font-black' : 'text-gray-400'}>
-                      ${item.sellPrice}
+                    <span className={selectedItemIds.has(item.id) ? 'text-orange-500 font-black' : 'text-gray-400'}>
+                      原${item.originalPrice}
                     </span>
                   </div>
                 ))}
@@ -237,12 +245,11 @@ export default function OptimizerPage() {
             </div>
           </div>
 
-          {/* 右側：計算結果黃金推薦排列組合 */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 min-h-[400px]">
               <div className="mb-6">
                 <h2 className="text-lg font-black text-gray-700 flex items-center gap-2">🎯 最佳黃金排列購買組合推薦 (已解鎖至多 6 組)</h2>
-                <p className="text-sm text-gray-400 mt-1">系統已為您挑選出【折後總價】最接近目標金額、且不超過上限的完美排列方式。</p>
+                <p className="text-sm text-gray-400 mt-1">系統已使用<strong className="text-orange-500">【原價】</strong>為您挑選出【折後總價】最接近目標金額、且不超過上限的完美排列方式。</p>
               </div>
 
               {optimizationResults.length > 0 ? (
@@ -250,7 +257,6 @@ export default function OptimizerPage() {
                   {optimizationResults.map((result, idx) => (
                     <div key={idx} className="border-2 border-dashed border-gray-200 rounded-2xl p-5 bg-gray-50/50 relative overflow-hidden transition hover:border-indigo-400">
                       
-                      {/* 排名標籤 */}
                       <div className={`absolute top-0 right-0 px-4 py-1 rounded-bl-xl text-xs font-black text-white ${idx < 3 ? 'bg-green-500' : 'bg-blue-500'}`}>
                         推薦組合第 {idx + 1} 首選
                       </div>
@@ -267,7 +273,6 @@ export default function OptimizerPage() {
                         </div>
                       </div>
 
-                      {/* 該組合清單 */}
                       <div className="bg-white rounded-xl border border-gray-100 shadow-sm divide-y">
                         {result.items.map(({ item, quantity, subtotal }) => (
                           <div key={item.id} className="p-3 flex justify-between items-center text-sm font-bold">
@@ -279,7 +284,7 @@ export default function OptimizerPage() {
                             </div>
                             <div className="text-right">
                               <span className="text-gray-600">${subtotal}</span>
-                              <span className="text-xs text-gray-400 block font-normal">單價 ${item.sellPrice}</span>
+                              <span className="text-xs text-orange-400 block font-normal">原價 ${item.originalPrice}</span>
                             </div>
                           </div>
                         ))}

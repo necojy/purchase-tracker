@@ -56,7 +56,15 @@ export async function DELETE(request: Request) {
     const data = await request.json();
     await prisma.item.delete({ where: { id: data.id } });
     return NextResponse.json({ success: true }, { status: 200 });
-  } catch (error) {
+  } catch (error: any) { // 🌟 加上 any 以便讀取 error.code
+    
+    // 🌟 新增：如果錯誤代碼是 P2003 (外鍵約束違反)，代表它被購買紀錄綁定了
+    if (error.code === 'P2003') {
+      console.log(`⚠️ 拒絕刪除：因為該商品已經有購買紀錄綁定。`);
+      return NextResponse.json({ error: '此商品已有購買紀錄，為保護帳本完整無法刪除' }, { status: 400 });
+    }
+
+    // 其他未知的嚴重錯誤才印出紅字
     console.error("❌ DELETE /api/items 發生錯誤:", error);
     return NextResponse.json({ error: '刪除品項失敗' }, { status: 500 });
   }
