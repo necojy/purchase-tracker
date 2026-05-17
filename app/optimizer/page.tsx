@@ -21,6 +21,12 @@ export default function OptimizerPage() {
   const [maxTolerance, setMaxTolerance] = useState<string>("200");   // 允許超出的上限範圍
   const [discountPercent, setDiscountPercent] = useState<string>("100"); // 折扣百分比
   
+  // 🌟 新增：可自行控制顯示的推薦組合筆數 (預設 6 筆)
+  const [displayCount, setDisplayCount] = useState<string>("6");
+  
+  // 🌟 新增：網頁端暫時性限購數量字典 (key 為 itemId, value 為暫時數量字串)
+  const [localMaxQuantities, setLocalMaxQuantities] = useState<Record<number, string>>({});
+  
   // 記錄哪些商品要參與湊單 (預設空集合，等資料載入後判定)
   const [selectedItemIds, setSelectedItemIds] = useState<Set<number>>(new Set());
 
@@ -33,16 +39,33 @@ export default function OptimizerPage() {
           const itemsData = Array.isArray(data) ? data : [];
           setItems(itemsData);
           
-          // 🌟 1. 載入商品時，讀取瀏覽器中記憶的勾選狀態
+          // 1. 載入商品時，讀取瀏覽器中記憶的勾選狀態
           const savedSelection = localStorage.getItem("optimizerSelectedItems");
           if (savedSelection) {
             const parsedIds = JSON.parse(savedSelection);
-            // 防呆：確保記憶裡的 ID 現在還真的存在於資料庫中（避免商品已刪除但還記著）
             const validIds = parsedIds.filter((id: number) => itemsData.some(i => i.id === id));
             setSelectedItemIds(new Set(validIds));
           } else {
-            // 如果從來沒設定過，預設還是全部勾選
             setSelectedItemIds(new Set(itemsData.map(i => i.id)));
+          }
+
+          // 🌟 2. 讀取瀏覽器記憶的「暫時性數量上限」設定
+          const savedMaxQ = localStorage.getItem("optimizerLocalMaxQuantities");
+          if (savedMaxQ) {
+            setLocalMaxQuantities(JSON.parse(savedMaxQ));
+          } else {
+            // 若無記憶，則拿資料庫設定的 maxQuantity (或保底 12) 作為初始顯示值
+            const initialMaxQ: Record<number, string> = {};
+            itemsData.forEach(i => {
+              initialMaxQ[i.id] = (i.maxQuantity || 12).toString();
+            });
+            setLocalMaxQuantities(initialMaxQ);
+          }
+
+          // 🌟 3. 讀取瀏覽器記憶的「顯示組合筆數」
+          const savedDisplayCount = localStorage.getItem("optimizerDisplayCount");
+          if (savedDisplayCount) {
+            setDisplayCount(savedDisplayCount);
           }
         }
       } catch (error) {
@@ -54,13 +77,14 @@ export default function OptimizerPage() {
     fetchItems();
   }, []);
 
-  // 🌟 2. 只要勾選狀態有變動，就立刻存進瀏覽器的記憶體中
+  // 🌟 儲存所有狀態至瀏覽器快取 (包含勾選、暫時數量、顯示筆數)
   useEffect(() => {
-    // 確保商品有載入才存，避免一開始載入中的空狀態把記憶洗掉
     if (items.length > 0) {
       localStorage.setItem("optimizerSelectedItems", JSON.stringify(Array.from(selectedItemIds)));
+      localStorage.setItem("optimizerLocalMaxQuantities", JSON.stringify(localMaxQuantities));
+      localStorage.setItem("optimizerDisplayCount", displayCount);
     }
-  }, [selectedItemIds, items]);
+  }, [selectedItemIds, localMaxQuantities, displayCount, items]);
 
   // 切換商品勾選狀態
   const toggleItemSelect = (id: number) => {
@@ -76,10 +100,12 @@ export default function OptimizerPage() {
     else setSelectedItemIds(new Set());
   };
 
+  // 核心多重背包演算法
   const optimizationResults = useMemo(() => {
     const target = Number(targetAmount);
     const tolerance = Number(maxTolerance);
     const pct = (Number(discountPercent) || 100) / 100; 
+    const displayLimit = Number(displayCount) || 6; // 🌟 讀取使用者設定的排列數量
     
     if (isNaN(target) || target <= 0 || items.length === 0 || selectedItemIds.size === 0 || pct <= 0) return [];
     
@@ -95,7 +121,11 @@ export default function OptimizerPage() {
 
     for (const item of candidates) {
       const price = item.originalPrice; 
-      const maxQ = item.maxQuantity || 12; 
+      
+      // 🌟 核心修正：優化優先取用網頁端暫時設定的數量，若沒有則用 item.maxQuantity 或 12 補底
+      const maxQ = localMaxQuantities[item.id] !== undefined && localMaxQuantities[item.id] !== "" 
+        ? Number(localMaxQuantities[item.id]) 
+        : (item.maxQuantity || 12); 
       
       const used = new Array(maxOrigLimit + 1).fill(0);
 
@@ -143,8 +173,9 @@ export default function OptimizerPage() {
       }
     }
 
-    return validResults.sort((a, b) => a.totalPrice - b.totalPrice).slice(0, 6);
-  }, [items, targetAmount, maxTolerance, discountPercent, selectedItemIds]);
+    // 🌟 依照使用者設定的數量進行切片輸出
+    return validResults.sort((a, b) => a.totalPrice - b.totalPrice).slice(0, displayLimit);
+  }, [items, targetAmount, maxTolerance, discountPercent, selectedItemIds, localMaxQuantities, displayCount]);
 
   if (isLoading) return <div className="min-h-screen flex justify-center items-center font-bold text-gray-500">智慧計算中心載入中...</div>;
 
@@ -186,7 +217,7 @@ export default function OptimizerPage() {
                   value={maxTolerance} 
                   onChange={(e) => setMaxTolerance(e.target.value)}
                   className="w-full border-2 border-gray-100 rounded-xl p-3 font-bold text-gray-600 outline-none focus:border-indigo-400 transition"
-                  placeholder="例如: 200"
+                  placeholder="example: 200"
                 />
               </div>
 
@@ -198,6 +229,20 @@ export default function OptimizerPage() {
                   onChange={(e) => setDiscountPercent(e.target.value)}
                   className="w-full border-2 border-orange-200 rounded-xl p-3 font-black text-orange-600 outline-none focus:border-orange-500 transition text-lg"
                   placeholder="例如: 88"
+                />
+              </div>
+
+              {/* 🌟 新增：自訂排列數量的輸入方塊 */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">顯示組合排列表數 (可自定義筆數)</label>
+                <input 
+                  type="number" 
+                  min="1"
+                  max="30"
+                  value={displayCount} 
+                  onChange={(e) => setDisplayCount(e.target.value)}
+                  className="w-full border-2 border-purple-100 rounded-xl p-3 font-black text-purple-600 outline-none focus:border-purple-400 transition text-base"
+                  placeholder="例如: 6"
                 />
                 <p className="text-xs text-gray-400 mt-2 leading-relaxed">
                   目前的【折後實際付款】總價範圍將落在：<br />
@@ -227,18 +272,40 @@ export default function OptimizerPage() {
                     onClick={() => toggleItemSelect(item.id)}
                     className={`flex items-center justify-between p-2.5 rounded-xl border text-sm font-bold cursor-pointer transition select-none ${selectedItemIds.has(item.id) ? 'bg-indigo-50/50 border-indigo-200 text-indigo-900' : 'bg-gray-50/50 border-gray-100 text-gray-400'}`}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
                       <input 
                         type="checkbox" 
                         checked={selectedItemIds.has(item.id)}
                         onChange={() => {}} 
-                        className="rounded text-indigo-600 cursor-pointer"
+                        className="rounded text-indigo-600 cursor-pointer shrink-0"
                       />
-                      <span>{item.name}</span>
+                      <span className="truncate">{item.name}</span>
                     </div>
-                    <span className={selectedItemIds.has(item.id) ? 'text-orange-500 font-black' : 'text-gray-400'}>
-                      原${item.originalPrice}
-                    </span>
+                    
+                    {/* 🌟 核心改良：點擊輸入框時使用 stopPropagation 阻擋外層列的外殼勾選觸發 */}
+                    <div className="flex items-center gap-2.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {selectedItemIds.has(item.id) && (
+                        <div className="flex items-center gap-0.5 text-xs font-black text-purple-600">
+                          <span>限</span>
+                          <input 
+                            type="number"
+                            min="1"
+                            value={localMaxQuantities[item.id] || ""}
+                            onChange={(e) => setLocalMaxQuantities({
+                              ...localMaxQuantities,
+                              [item.id]: e.target.value
+                            })}
+                            placeholder="12"
+                            className="w-11 border border-purple-200 rounded px-1 py-0.5 text-center bg-white font-black text-purple-700 outline-none focus:border-purple-500 shadow-sm"
+                            title="僅在此頁面臨時調整上限，不會同步至常用清單資料庫"
+                          />
+                        </div>
+                      )}
+                      <span className={selectedItemIds.has(item.id) ? 'text-orange-500 font-black' : 'text-gray-400'}>
+                        原${item.originalPrice}
+                      </span>
+                    </div>
+
                   </div>
                 ))}
               </div>
@@ -248,8 +315,8 @@ export default function OptimizerPage() {
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 min-h-[400px]">
               <div className="mb-6">
-                <h2 className="text-lg font-black text-gray-700 flex items-center gap-2">🎯 最佳黃金排列購買組合推薦 (已解鎖至多 6 組)</h2>
-                <p className="text-sm text-gray-400 mt-1">系統已使用<strong className="text-orange-500">【原價】</strong>為您挑選出【折後總價】最接近目標金額、且不超過上限的完美排列方式。</p>
+                <h2 className="text-lg font-black text-gray-700 flex items-center gap-2">🎯 最佳黃金排列購買組合推薦 (已設定為至多 {displayCount || 6} 組)</h2>
+                <p className="text-sm text-gray-400 mt-1">系統已使用【原價】與【網頁自訂限購】為您挑選出【折後總價】最接近目標金額的完美排列方式。</p>
               </div>
 
               {optimizationResults.length > 0 ? (
