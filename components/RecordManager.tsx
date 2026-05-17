@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import RecordForm from "./RecordForm"; 
 import RecordCard from "./RecordCard"; 
 
@@ -19,6 +19,18 @@ export default function RecordManager({ items, records, stores, refreshData, tar
   const [showReconciled, setShowReconciled] = useState(false);
   const [showRefunded, setShowRefunded] = useState(false);
 
+  // 🌟 新增：偵測有沒有從「湊單計算機」傳過來的資料
+  useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("pendingAutoRecord")) {
+      // 自動打開表單
+      setIsAddingRecord(true);
+      // 平滑捲動到最上面讓使用者看到表單
+      setTimeout(() => {
+        document.getElementById('record-manager-section')?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  }, []);
+  
   // 1. 基本過濾邏輯
   // 🌟 1. 雙重過濾邏輯 (人員篩選 + 店鋪點擊篩選)
   let filteredRecords = records;

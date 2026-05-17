@@ -15,11 +15,35 @@ export default function RecordForm({ items, stores, refreshData, onClose }: Prop
   
   const [recordItems, setRecordItems] = useState([{ itemId: "", quantity: 1, originalPrice: "", costPrice: "" }]);
 
+// 🌟 升級版 useEffect：負責處理「預設一筆空資料」或「載入計算機傳來的資料」
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const pendingStr = localStorage.getItem("pendingAutoRecord");
+      if (pendingStr) {
+        try {
+          const pendingData = JSON.parse(pendingStr);
+          if (pendingData && pendingData.items && pendingData.items.length > 0) {
+            // 自動帶入商品列表與數量
+            setRecordItems(pendingData.items);
+            // 自動帶入折扣後的預估應付金額
+            setRecordForm(prev => ({ ...prev, costPrice: pendingData.totalPrice }));
+            
+            // 🌟 載入完畢後立刻把記憶刪除，避免下次開表單又被觸發
+            localStorage.removeItem("pendingAutoRecord");
+            return; // 成功載入就不執行下方的預設邏輯了
+          }
+        } catch (e) {
+          console.error("解析待處理資料失敗", e);
+        }
+      }
+    }
+
+    // 如果沒有待處理資料，就走原本的預設邏輯 (給一筆空的)
     if (items.length > 0 && !recordItems[0].itemId) {
       setRecordItems([{ itemId: items[0].id.toString(), quantity: 1, originalPrice: items[0].originalPrice?.toString() || "", costPrice: "" }]);
     }
   }, [items]);
+  
 // 🌟 新增：自動將取貨店名「真正」綁定為清單上的第一間店
   useEffect(() => {
     const currentCategoryStores = stores.filter(s => s.category === recordForm.pickupCategory);
