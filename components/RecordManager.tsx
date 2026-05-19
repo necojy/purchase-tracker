@@ -2,15 +2,17 @@
 
 import { useState, useEffect } from "react";
 import RecordForm from "./RecordForm"; 
-import RecordCard from "./RecordCard"; 
+import RecordHeader from "./record-manager/RecordHeader";
+import RecordGroupList from "./record-manager/RecordGroupList";
 
 type Item = { id: number; name: string; sellPrice: number; originalPrice: number; maxQuantity: number; };
 type PurchaseItem = { id: number; quantity: number; costPrice: string | number; item: Item; itemId: number; };
 type RecordType = { id: number; location: string; buyer: string; paymentMethod: string; purchaseDate: string; items: PurchaseItem[]; pickupLocation: string; isReconciled: boolean; isRefunded: boolean; };
 type Store = { id: number; name: string; category: string; };
+
 type Props = { 
   items: Item[]; records: RecordType[]; stores: Store[]; refreshData: () => void; 
-  targetStore: string | null; setTargetStore: (store: string | null) => void; // 🌟 接收狀態
+  targetStore: string | null; setTargetStore: (store: string | null) => void;
 };
 
 export default function RecordManager({ items, records, stores, refreshData, targetStore, setTargetStore }: Props) {
@@ -19,20 +21,17 @@ export default function RecordManager({ items, records, stores, refreshData, tar
   const [showReconciled, setShowReconciled] = useState(false);
   const [showRefunded, setShowRefunded] = useState(false);
 
-  // 🌟 新增：偵測有沒有從「湊單計算機」傳過來的資料
+  // 偵測有沒有從「湊單計算機」傳過來的資料以自動開啟表單
   useEffect(() => {
     if (typeof window !== "undefined" && localStorage.getItem("pendingAutoRecord")) {
-      // 自動打開表單
       setIsAddingRecord(true);
-      // 平滑捲動到最上面讓使用者看到表單
       setTimeout(() => {
         document.getElementById('record-manager-section')?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
     }
   }, []);
   
-  // 1. 基本過濾邏輯
-  // 🌟 1. 雙重過濾邏輯 (人員篩選 + 店鋪點擊篩選)
+  // 資料過濾邏輯 (人員篩選 + 店鋪篩選)
   let filteredRecords = records;
   if (filterBuyer !== "全部") {
     filteredRecords = filteredRecords.filter(r => r.buyer === filterBuyer);
@@ -41,100 +40,38 @@ export default function RecordManager({ items, records, stores, refreshData, tar
     filteredRecords = filteredRecords.filter(r => r.pickupLocation === targetStore);
   }
 
+  // 分類為：進行中、已對帳、已退款
   const activeRecords = filteredRecords.filter(r => !r.isRefunded && !r.isReconciled);
-  
   const reconciledRecords = filteredRecords.filter(r => !r.isRefunded && r.isReconciled);
   const refundedRecords = filteredRecords.filter(r => r.isRefunded);
 
-  // 🌟 2. 核心新功能：按日期分群的邏輯
-  const groupRecordsByDate = (recordsToGroup: RecordType[]) => {
-    const grouped: { [key: string]: RecordType[] } = {};
-    
-    recordsToGroup.forEach(record => {
-      // 轉換成台灣本地時區日期
-      const dateObj = new Date(record.purchaseDate);
-      const dateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-      
-      if (!grouped[dateStr]) grouped[dateStr] = [];
-      grouped[dateStr].push(record);
-    });
-    
-    return grouped;
-  };
-
-  // 🌟 3. 渲染分群列表的專屬元件
-  const renderGroupedRecords = (recordsToRender: RecordType[]) => {
-    const grouped = groupRecordsByDate(recordsToRender);
-    // 把日期由新到舊排序
-    const sortedDates = Object.keys(grouped).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-
-    return sortedDates.map(dateStr => (
-      <div key={dateStr} className="mb-8">
-        {/* 🌟 日期分隔線標題 */}
-        <div className="flex items-center gap-4 mb-4 pl-2">
-          <h3 className="font-black text-gray-500 tracking-wider bg-gray-100 px-3 py-1 rounded-lg text-sm">
-            📅 {dateStr}
-          </h3>
-          <div className="flex-1 h-[2px] bg-gray-100 rounded-full"></div>
-        </div>
-        
-        {/* 該日期的所有卡片 */}
-        <div className="space-y-4">
-          {grouped[dateStr].map(record => (
-            <RecordCard key={record.id} record={record} items={items} refreshData={refreshData} />
-          ))}
-        </div>
-      </div>
-    ));
-  };
-
   return (
     <div id="record-manager-section" className="scroll-mt-8">
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 mt-8 gap-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full xl:w-auto">
-          <h1 className="text-2xl font-black tracking-wide flex items-center gap-2 shrink-0">購買與獲利紀錄 🧾</h1>
-          <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto scrollbar-hide">
-            {['全部', '洪', '雅', '宥', '崑'].map(name => (
-              <button
-                key={name}
-                onClick={() => setFilterBuyer(name)}
-                className={`px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap transition-all ${
-                  filterBuyer === name ? 'bg-blue-600 text-white shadow-md transform scale-105' : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
-                }`}
-              >
-                {name === '全部' ? '全部人員' : name}
-              </button>
-            ))}
-          </div>
-          {/* 🌟 新增：如果有點擊特定店鋪，這裡會出現取消篩選的按鈕 */}
-          {targetStore && (
-            <button 
-              onClick={() => setTargetStore(null)}
-              className="ml-0 sm:ml-4 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-2 transition animate-fade-in shadow-sm"
-            >
-              📍 篩選：{targetStore} ✕
-            </button>
-          )}
-        </div>
-        <button onClick={() => setIsAddingRecord(!isAddingRecord)} className="w-full xl:w-auto bg-[#1C4ED8] hover:bg-blue-700 text-white font-bold py-3 sm:py-2 px-5 rounded-full shadow-md transition text-center shrink-0">
-          + 開始新紀錄
-        </button>
-      </div>
-
       
+      {/* 1. 頂部控制列 */}
+      <RecordHeader 
+        filterBuyer={filterBuyer} setFilterBuyer={setFilterBuyer}
+        targetStore={targetStore} setTargetStore={setTargetStore}
+        isAddingRecord={isAddingRecord} setIsAddingRecord={setIsAddingRecord}
+      />
+
+      {/* 2. 新增紀錄表單 */}
       {isAddingRecord && (
-  <RecordForm items={items} records={records} stores={stores} refreshData={refreshData} onClose={() => setIsAddingRecord(false)} />
-)}
-      {/* 進行中紀錄 */}
+        <RecordForm items={items} records={records} stores={stores} refreshData={refreshData} onClose={() => setIsAddingRecord(false)} />
+      )}
+      
+      {/* 3. 進行中紀錄 */}
       <div className="mt-4">
         {activeRecords.length === 0 ? (
-          <div className="text-center py-8 text-gray-400 font-bold bg-gray-50 rounded-3xl border border-dashed border-gray-200">目前沒有符合條件的進行中訂單</div>
+          <div className="text-center py-8 text-gray-400 font-bold bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+            目前沒有符合條件的進行中訂單
+          </div>
         ) : (
-          renderGroupedRecords(activeRecords) // 🌟 套用分群渲染
+          <RecordGroupList records={activeRecords} items={items} refreshData={refreshData} />
         )}
       </div>
 
-      {/* 已對帳紀錄 */}
+      {/* 4. 已對帳紀錄 (折疊) */}
       {reconciledRecords.length > 0 && (
         <div className="mt-10">
           <button onClick={() => setShowReconciled(!showReconciled)} className="flex items-center gap-2 text-green-600 font-bold mb-4 hover:text-green-700 transition px-2">
@@ -143,13 +80,13 @@ export default function RecordManager({ items, records, stores, refreshData, tar
           </button>
           {showReconciled && (
             <div className="animate-fade-in">
-              {renderGroupedRecords(reconciledRecords)} {/* 🌟 套用分群渲染 */}
+              <RecordGroupList records={reconciledRecords} items={items} refreshData={refreshData} />
             </div>
           )}
         </div>
       )}
 
-      {/* 已退款紀錄 */}
+      {/* 5. 已退款紀錄 (折疊) */}
       {refundedRecords.length > 0 && (
         <div className="mt-10">
           <button onClick={() => setShowRefunded(!showRefunded)} className="flex items-center gap-2 text-gray-400 font-bold mb-4 hover:text-gray-600 transition px-2">
@@ -158,7 +95,7 @@ export default function RecordManager({ items, records, stores, refreshData, tar
           </button>
           {showRefunded && (
             <div className="animate-fade-in">
-              {renderGroupedRecords(refundedRecords)} {/* 🌟 套用分群渲染 */}
+              <RecordGroupList records={refundedRecords} items={items} refreshData={refreshData} />
             </div>
           )}
         </div>
