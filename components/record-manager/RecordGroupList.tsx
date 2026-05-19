@@ -6,14 +6,15 @@ type Item = { id: number; name: string; sellPrice: number; originalPrice: number
 type PurchaseItem = { id: number; quantity: number; costPrice: string | number; item: Item; itemId: number; };
 type RecordType = { id: number; location: string; buyer: string; paymentMethod: string; purchaseDate: string; items: PurchaseItem[]; pickupLocation: string; isReconciled: boolean; isRefunded: boolean; };
 
+// 🌟 新增：接收 onCopy 函式
 type Props = {
   records: RecordType[];
   items: Item[];
   refreshData: () => void;
+  onCopy: (record: RecordType) => void; 
 };
 
-export default function RecordGroupList({ records, items, refreshData }: Props) {
-  // 將紀錄依照日期分群
+export default function RecordGroupList({ records, items, refreshData, onCopy }: Props) {
   const groupRecordsByDate = (recordsToGroup: RecordType[]) => {
     const grouped: { [key: string]: RecordType[] } = {};
     
@@ -49,6 +50,7 @@ export default function RecordGroupList({ records, items, refreshData }: Props) 
                 record={record} 
                 items={items} 
                 refreshData={refreshData} 
+                onCopy={() => onCopy(record)} // 🌟 將指令傳給卡片
               />
             ))}
           </div>

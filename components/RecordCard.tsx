@@ -6,9 +6,9 @@ type Item = { id: number; name: string; sellPrice: number; originalPrice: number
 type PurchaseItem = { id: number; quantity: number; costPrice: string | number; item: Item; itemId: number; };
 type RecordType = { id: number; location: string; buyer: string; paymentMethod: string; purchaseDate: string; items: PurchaseItem[]; pickupLocation: string; isReconciled: boolean; isRefunded: boolean; };
 
-type Props = { record: RecordType; items: Item[]; refreshData: () => void; };
+type Props = { record: RecordType; items: Item[]; refreshData: () => void; onCopy?: () => void; };
 
-export default function RecordCard({ record, items, refreshData }: Props) {
+export default function RecordCard({ record, items, refreshData, onCopy }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [editForm, setEditForm] = useState({ id: 0, location: "", buyer: "", paymentMethod: "", pickupLocation: "" });
   const [editItems, setEditItems] = useState([{ itemId: "", quantity: 1, costPrice: "" }]);
@@ -141,10 +141,16 @@ export default function RecordCard({ record, items, refreshData }: Props) {
             })}
           </div>
 
+          {/* 🌟 乾淨無嵌套的按鈕區塊 */}
           {!record.isRefunded && (
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-6">
               <button onClick={addEditItemRow} className="text-blue-600 font-bold text-sm bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition w-full md:w-auto">+ 手動新增商品</button>
               <div className="flex gap-3 w-full md:w-auto">
+                
+                {onCopy && (
+                  <button onClick={onCopy} className="flex-1 md:flex-none text-indigo-600 font-bold text-sm bg-indigo-50 px-6 py-2.5 rounded-lg hover:bg-indigo-100 transition shadow-sm">複製紀錄</button>
+                )}
+
                 <button onClick={handleDeleteRecord} className="flex-1 md:flex-none text-red-500 font-bold text-sm bg-red-50 px-6 py-2.5 rounded-lg hover:bg-red-100 transition">刪除整筆紀錄</button>
                 <button onClick={handleSaveEdit} className="flex-1 md:flex-none text-white font-bold text-sm bg-blue-600 px-6 py-2.5 rounded-lg hover:bg-blue-700 transition shadow-sm">儲存修改</button>
               </div>
