@@ -203,23 +203,24 @@ export default function StatisticsPage() {
               <label className="text-sm font-bold text-orange-600 shrink-0">日期：</label>
               <DatePicker
                 selected={new Date(selectedDate)}
-                onChange={(date) => {
+                // 🌟 修正 1：明確宣告 date 的型別為 Date 或是 null
+                onChange={(date: Date | null) => {
                   if (date) {
                     const localDateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
                     setSelectedDate(localDateStr);
                   }
                 }}
-                dateFormat="MM-dd" // 🌟 修改這裡：隱藏年份，只顯示 月-日
+                dateFormat="MM-dd"
                 className="font-black text-orange-700 w-full tracking-wider"
-                renderDayContents={(day, date) => {
+                // 🌟 修正 2：明確宣告 day 是數字，date 是 Date 物件
+                renderDayContents={(day: number, date: Date) => {
                   const currentDayStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
                   const locationType = dateLocationMap.get(currentDayStr);
                   
-                  // 🌟 核心：根據不同通路決定點點的顏色
                   let dotColor = "";
-                  if (locationType === "蝦皮") dotColor = "bg-orange-500";          // 蝦皮代表色 (橘色)
-                  else if (locationType === "屈臣氏") dotColor = "bg-teal-400";     // 屈臣氏代表色 (藍綠色)
-                  else if (locationType === "both") dotColor = "bg-purple-500";     // 都有買的特別色 (紫色)
+                  if (locationType === "蝦皮") dotColor = "bg-orange-500";          
+                  else if (locationType === "屈臣氏") dotColor = "bg-teal-400";     
+                  else if (locationType === "both") dotColor = "bg-purple-500";     
                   
                   return (
                     <div className="relative flex justify-center items-center h-full w-full">
