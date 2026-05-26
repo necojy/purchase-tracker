@@ -43,8 +43,8 @@ export default function StatisticsPage() {
     fetchRecords();
   }, []);
 
-  const chartData = useMemo(() => {
-    // 1. 先過濾出「特定日期」且「在蝦皮購買」且「未退款」的紀錄
+  // 🌟 新增：計算當日的財務總覽數據 (營業額、成本、利潤)
+  const daySummary = useMemo(() => {
     const targetRecords = records.filter(r => {
       if (r.isRefunded) return false; 
       if (r.location !== "蝦皮") return false; 
@@ -55,10 +55,41 @@ export default function StatisticsPage() {
       return localDateStr === selectedDate;
     });
 
-    // 🌟 升級：在暫存字典裡多記錄一個 totalCost (總成本)
+    let totalQuantity = 0;
+    let totalCost = 0;
+    let totalRevenue = 0;
+
+    targetRecords.forEach(record => {
+      if (selectedBuyer !== "全部" && record.buyer !== selectedBuyer) return;
+
+      record.items.forEach(pItem => {
+        totalQuantity += pItem.quantity;
+        totalCost += (Number(pItem.costPrice) || 0) * pItem.quantity;
+        totalRevenue += (Number(pItem.item?.sellPrice) || 0) * pItem.quantity;
+      });
+    });
+
+    return {
+      quantity: totalQuantity,
+      cost: Math.round(totalCost),
+      revenue: Math.round(totalRevenue),
+      profit: Math.round(totalRevenue - totalCost)
+    };
+  }, [records, selectedDate, selectedBuyer]);
+
+  const chartData = useMemo(() => {
+    const targetRecords = records.filter(r => {
+      if (r.isRefunded) return false; 
+      if (r.location !== "蝦皮") return false; 
+      
+      const dateObj = new Date(r.purchaseDate);
+      const localDateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+      
+      return localDateStr === selectedDate;
+    });
+
     const itemMap: Record<string, { name: string; quantity: number; totalCost: number }> = {};
 
-    // 2. 計算商品數量與總成本
     targetRecords.forEach(record => {
       if (selectedBuyer !== "全部" && record.buyer !== selectedBuyer) return;
 
@@ -72,20 +103,17 @@ export default function StatisticsPage() {
       });
     });
 
-    // 🌟 3. 算出平均單價後，轉換成陣列，並根據數量由多到少排序
     const sortedData = Object.values(itemMap).map(item => ({
       ...item,
-      // 平均進貨價 = 總成本 / 總數量 (四捨五入到小數點後 1 位)
       avgCost: item.quantity > 0 ? (item.totalCost / item.quantity).toFixed(1) : 0
     })).sort((a, b) => b.quantity - a.quantity);
 
     return sortedData;
   }, [records, selectedDate, selectedBuyer]);
 
-  // 🌟 新增：客製化滑鼠懸浮提示框 (Tooltip)
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const data = payload[0].payload; // 取出我們剛剛算好的整包資料
+      const data = payload[0].payload; 
       return (
         <div className="bg-white p-4 rounded-2xl shadow-xl border border-gray-100 z-50">
           <p className="font-black text-gray-700 mb-2 border-b border-gray-100 pb-2">{label}</p>
@@ -111,6 +139,7 @@ export default function StatisticsPage() {
     <main className="min-h-screen p-4 sm:p-8 bg-[#F4F6F8] font-sans text-gray-800">
       <div className="max-w-6xl mx-auto space-y-6">
         
+        {/* 上方導覽與篩選列 */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-gray-100 gap-4">
           <div className="flex items-center gap-4">
             <Link href="/" className="text-gray-400 hover:text-blue-600 font-black text-xl transition shrink-0">
@@ -147,27 +176,42 @@ export default function StatisticsPage() {
           </div>
         </div>
 
+        {/* 統計圖表區塊 */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
-          <div className="mb-6 flex justify-between items-end">
-            <div>
-              <h2 className="text-lg font-bold text-gray-700">
-                📦 {selectedDate} <span style={{ color: BUYER_COLORS[selectedBuyer] }}>{selectedBuyer}</span> 的購買數量排行
-              </h2>
-              <p className="text-sm text-gray-400 mt-1">直方圖已由高至低排序，方便快速檢查是否有大量重複購買之商品。</p>
-            </div>
-            
-            {chartData.length > 0 && (
-              <div className="text-right hidden sm:block">
-                <span className="text-sm font-bold text-gray-400">當日購買總件數</span>
-                <p className="text-3xl font-black" style={{ color: BUYER_COLORS[selectedBuyer] }}>
-                  {chartData.reduce((sum, item) => sum + item.quantity, 0)} 件
+          <div className="mb-6">
+            <h2 className="text-lg font-bold text-gray-700">
+              📦 {selectedDate} <span style={{ color: BUYER_COLORS[selectedBuyer] }}>{selectedBuyer}</span> 的購買總覽與排行
+            </h2>
+            <p className="text-sm text-gray-400 mt-1">系統已自動為您統整當日的財務指標，並將品項由高至低進行數量排序。</p>
+          </div>
+
+          {/* 🌟 新增：當日數據總覽四大卡片區塊 */}
+          {chartData.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              <div className="bg-gray-50/60 rounded-2xl p-4 border border-gray-100 shadow-sm">
+                <span className="text-xs font-bold text-gray-400 block mb-1">當日購買總件數</span>
+                <p className="text-2xl font-black text-gray-700">{daySummary.quantity} 件</p>
+              </div>
+              <div className="bg-gray-50/60 rounded-2xl p-4 border border-gray-100 shadow-sm">
+                <span className="text-xs font-bold text-gray-400 block mb-1">當日預估總營業額</span>
+                <p className="text-2xl font-black text-blue-600">${daySummary.revenue}</p>
+              </div>
+              <div className="bg-gray-50/60 rounded-2xl p-4 border border-gray-100 shadow-sm">
+                <span className="text-xs font-bold text-gray-400 block mb-1">當日實際總進貨成本</span>
+                <p className="text-2xl font-black text-gray-500">${daySummary.cost}</p>
+              </div>
+              <div className="bg-indigo-50/40 rounded-2xl p-4 border border-indigo-100 shadow-sm">
+                <span className="text-xs font-bold text-indigo-400 block mb-1">當日淨利純利收益</span>
+                <p className={`text-2xl font-black ${daySummary.profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {daySummary.profit >= 0 ? `+$${daySummary.profit}` : `-$${Math.abs(daySummary.profit)}`}
                 </p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {chartData.length > 0 ? (
             <div className="w-full h-[450px]">
+              {/* 💡 使用 99% 寬度完美消除 Recharts 的初始尺寸警告 */}
               <ResponsiveContainer width="99%" height="100%">
                 <BarChart data={chartData} margin={{ top: 20, right: 0, left: -20, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
@@ -180,7 +224,6 @@ export default function StatisticsPage() {
                   />
                   <YAxis allowDecimals={false} tick={{ fill: '#6B7280', fontWeight: 'bold' }} />
                   
-                  {/* 🌟 核心：套用我們剛剛做好的客製化 Tooltip */}
                   <Tooltip 
                     content={<CustomTooltip />} 
                     cursor={{ fill: '#F3F4F6' }}
