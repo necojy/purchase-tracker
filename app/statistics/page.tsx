@@ -24,7 +24,6 @@ export default function StatisticsPage() {
   const todayStr = new Date().toLocaleDateString('en-CA'); 
   const [selectedDate, setSelectedDate] = useState(todayStr);
   
-  // 🌟 新增狀態：目前選擇的人員 (預設為全部)
   const [selectedBuyer, setSelectedBuyer] = useState("全部");
 
   useEffect(() => {
@@ -56,27 +55,55 @@ export default function StatisticsPage() {
       return localDateStr === selectedDate;
     });
 
-    const itemMap: Record<string, { name: string; quantity: number }> = {};
+    // 🌟 升級：在暫存字典裡多記錄一個 totalCost (總成本)
+    const itemMap: Record<string, { name: string; quantity: number; totalCost: number }> = {};
 
-    // 2. 計算商品數量
+    // 2. 計算商品數量與總成本
     targetRecords.forEach(record => {
-      // 🌟 如果有選擇特定人員，就跳過其他人的紀錄
       if (selectedBuyer !== "全部" && record.buyer !== selectedBuyer) return;
 
       record.items.forEach(pItem => {
         const itemName = pItem.item?.name || "未知商品";
         if (!itemMap[itemName]) {
-          itemMap[itemName] = { name: itemName, quantity: 0 };
+          itemMap[itemName] = { name: itemName, quantity: 0, totalCost: 0 };
         }
         itemMap[itemName].quantity += pItem.quantity;
+        itemMap[itemName].totalCost += (Number(pItem.costPrice) || 0) * pItem.quantity;
       });
     });
 
-    // 🌟 3. 轉換成陣列，並根據數量「由多到少」排序 (遞減)
-    const sortedData = Object.values(itemMap).sort((a, b) => b.quantity - a.quantity);
+    // 🌟 3. 算出平均單價後，轉換成陣列，並根據數量由多到少排序
+    const sortedData = Object.values(itemMap).map(item => ({
+      ...item,
+      // 平均進貨價 = 總成本 / 總數量 (四捨五入到小數點後 1 位)
+      avgCost: item.quantity > 0 ? (item.totalCost / item.quantity).toFixed(1) : 0
+    })).sort((a, b) => b.quantity - a.quantity);
 
     return sortedData;
   }, [records, selectedDate, selectedBuyer]);
+
+  // 🌟 新增：客製化滑鼠懸浮提示框 (Tooltip)
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload; // 取出我們剛剛算好的整包資料
+      return (
+        <div className="bg-white p-4 rounded-2xl shadow-xl border border-gray-100 z-50">
+          <p className="font-black text-gray-700 mb-2 border-b border-gray-100 pb-2">{label}</p>
+          <div className="space-y-1.5 mt-2">
+            <p className="text-sm font-bold flex items-center gap-2" style={{ color: payload[0].fill }}>
+              <span>📦 總購買數：</span>
+              <span className="text-base">{data.quantity} 件</span>
+            </p>
+            <p className="text-sm font-bold text-orange-500 flex items-center gap-2">
+              <span>💰 平均進貨單價：</span>
+              <span className="text-base">${data.avgCost}</span>
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   if (isLoading) return <div className="min-h-screen flex justify-center items-center font-bold text-gray-500">載入數據中...</div>;
 
@@ -84,7 +111,6 @@ export default function StatisticsPage() {
     <main className="min-h-screen p-4 sm:p-8 bg-[#F4F6F8] font-sans text-gray-800">
       <div className="max-w-6xl mx-auto space-y-6">
         
-        {/* 上方導覽與篩選列 */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-gray-100 gap-4">
           <div className="flex items-center gap-4">
             <Link href="/" className="text-gray-400 hover:text-blue-600 font-black text-xl transition shrink-0">
@@ -94,7 +120,6 @@ export default function StatisticsPage() {
           </div>
           
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {/* 🌟 新增：人員篩選下拉選單 */}
             <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
               <label className="text-sm font-bold text-gray-500">人員：</label>
               <select 
@@ -122,7 +147,6 @@ export default function StatisticsPage() {
           </div>
         </div>
 
-        {/* 統計圖表區塊 */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
           <div className="mb-6 flex justify-between items-end">
             <div>
@@ -132,7 +156,6 @@ export default function StatisticsPage() {
               <p className="text-sm text-gray-400 mt-1">直方圖已由高至低排序，方便快速檢查是否有大量重複購買之商品。</p>
             </div>
             
-            {/* 顯示總數 */}
             {chartData.length > 0 && (
               <div className="text-right hidden sm:block">
                 <span className="text-sm font-bold text-gray-400">當日購買總件數</span>
@@ -145,30 +168,30 @@ export default function StatisticsPage() {
 
           {chartData.length > 0 ? (
             <div className="w-full h-[450px]">
-              {/* 🌟 加上 minWidth={1} minHeight={1} 消除計算警告 */}
-              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+              <ResponsiveContainer width="99%" height="100%">
                 <BarChart data={chartData} margin={{ top: 20, right: 0, left: -20, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                   <XAxis 
                     dataKey="name" 
                     tick={{ fill: '#6B7280', fontSize: 12, fontWeight: 'bold' }} 
-                    angle={-45} // 字體傾斜避免擠在一起
+                    angle={-45} 
                     textAnchor="end"
-                    interval={0} // 強制顯示所有標籤
+                    interval={0} 
                   />
                   <YAxis allowDecimals={false} tick={{ fill: '#6B7280', fontWeight: 'bold' }} />
+                  
+                  {/* 🌟 核心：套用我們剛剛做好的客製化 Tooltip */}
                   <Tooltip 
+                    content={<CustomTooltip />} 
                     cursor={{ fill: '#F3F4F6' }}
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', fontWeight: 'bold' }}
                   />
                   
-                  {/* 🌟 單一直方圖，顏色動態跟隨選擇的人員 */}
                   <Bar 
                     dataKey="quantity" 
                     fill={BUYER_COLORS[selectedBuyer] || BUYER_COLORS["全部"]} 
                     radius={[6, 6, 0, 0]} 
-                    name={`${selectedBuyer} 的購買數量`} 
-                    barSize={40} // 讓柱子不要太粗
+                    name="購買數量" 
+                    barSize={40} 
                   />
                 </BarChart>
               </ResponsiveContainer>
