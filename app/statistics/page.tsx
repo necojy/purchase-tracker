@@ -3,18 +3,19 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 type Item = { id: number; name: string; sellPrice: number; };
 type PurchaseItem = { id: number; quantity: number; costPrice: number; item: Item; };
 type RecordType = { id: number; location: string; buyer: string; purchaseDate: string; isReconciled: boolean; isRefunded: boolean; items: PurchaseItem[]; };
 
-// 🌟 為每位成員設定專屬的圖表顏色
 const BUYER_COLORS: Record<string, string> = {
-  "全部": "#F97316", // 橘色 (預設)
-  "洪": "#3B82F6",   // 藍色
-  "雅": "#10B981",   // 綠色
-  "宥": "#F59E0B",   // 黃色
-  "崑": "#8B5CF6",   // 紫色
+  "全部": "#F97316", 
+  "洪": "#3B82F6",   
+  "雅": "#10B981",   
+  "宥": "#F59E0B",   
+  "崑": "#8B5CF6",   
 };
 
 export default function StatisticsPage() {
@@ -23,8 +24,8 @@ export default function StatisticsPage() {
   
   const todayStr = new Date().toLocaleDateString('en-CA'); 
   const [selectedDate, setSelectedDate] = useState(todayStr);
-  
   const [selectedBuyer, setSelectedBuyer] = useState("全部");
+  const [selectedLocation, setSelectedLocation] = useState("全部");
 
   useEffect(() => {
     const fetchRecords = async () => {
@@ -43,11 +44,36 @@ export default function StatisticsPage() {
     fetchRecords();
   }, []);
 
-  // 🌟 新增：計算當日的財務總覽數據 (營業額、成本、利潤)
+  // 🌟 升級功能：掃描所有日期，並記錄該日期的「購買通路」狀態
+  const dateLocationMap = useMemo(() => {
+    const map = new Map<string, string>();
+    records.forEach(r => {
+      if (!r.isRefunded) {
+        const dateObj = new Date(r.purchaseDate);
+        const localDateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+        
+        const existingLocation = map.get(localDateStr);
+        if (!existingLocation) {
+          // 如果這天還沒有紀錄，就記下目前的通路 (例如: 蝦皮 或 屈臣氏)
+          map.set(localDateStr, r.location);
+        } else if (existingLocation !== r.location && existingLocation !== "both") {
+          // 如果這天已經有紀錄，而且跟現在這筆通路不同，就標記為 "both" (都有)
+          map.set(localDateStr, "both");
+        }
+      }
+    });
+    return map;
+  }, [records]);
+
   const daySummary = useMemo(() => {
     const targetRecords = records.filter(r => {
       if (r.isRefunded) return false; 
-      if (r.location !== "蝦皮") return false; 
+      
+      if (selectedLocation !== "全部") {
+        if (r.location !== selectedLocation) return false;
+      } else {
+        if (r.location !== "蝦皮" && r.location !== "屈臣氏") return false;
+      }
       
       const dateObj = new Date(r.purchaseDate);
       const localDateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
@@ -75,12 +101,17 @@ export default function StatisticsPage() {
       revenue: Math.round(totalRevenue),
       profit: Math.round(totalRevenue - totalCost)
     };
-  }, [records, selectedDate, selectedBuyer]);
+  }, [records, selectedDate, selectedBuyer, selectedLocation]);
 
   const chartData = useMemo(() => {
     const targetRecords = records.filter(r => {
       if (r.isRefunded) return false; 
-      if (r.location !== "蝦皮") return false; 
+      
+      if (selectedLocation !== "全部") {
+        if (r.location !== selectedLocation) return false;
+      } else {
+        if (r.location !== "蝦皮" && r.location !== "屈臣氏") return false;
+      }
       
       const dateObj = new Date(r.purchaseDate);
       const localDateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
@@ -109,7 +140,7 @@ export default function StatisticsPage() {
     })).sort((a, b) => b.quantity - a.quantity);
 
     return sortedData;
-  }, [records, selectedDate, selectedBuyer]);
+  }, [records, selectedDate, selectedBuyer, selectedLocation]);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -137,55 +168,89 @@ export default function StatisticsPage() {
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-[#F4F6F8] font-sans text-gray-800">
+      
+      <style dangerouslySetInnerHTML={{__html: `
+        .react-datepicker-wrapper { display: block; width: 100%; }
+        .react-datepicker__input-container input { width: 100%; outline: none; background: transparent; cursor: pointer; text-align: center; }
+      `}} />
+
       <div className="max-w-6xl mx-auto space-y-6">
         
-        {/* 上方導覽與篩選列 */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-gray-100 gap-4">
           <div className="flex items-center gap-4">
             <Link href="/" className="text-gray-400 hover:text-blue-600 font-black text-xl transition shrink-0">
               ← 返回主頁
             </Link>
-            <h1 className="text-xl sm:text-2xl font-black tracking-wide text-orange-600">🦐 蝦皮單日購買統計</h1>
+            <h1 className="text-xl sm:text-2xl font-black tracking-wide text-orange-600">📊 營運單日購買統計</h1>
           </div>
           
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
-              <label className="text-sm font-bold text-gray-500">人員：</label>
-              <select 
-                value={selectedBuyer} 
-                onChange={(e) => setSelectedBuyer(e.target.value)}
-                className="bg-transparent font-bold text-gray-700 outline-none cursor-pointer"
-              >
-                <option value="全部">全部總計</option>
-                <option value="洪">洪</option>
-                <option value="雅">雅</option>
-                <option value="宥">宥</option>
-                <option value="崑">崑</option>
+              <label className="text-sm font-bold text-gray-500">地方：</label>
+              <select value={selectedLocation} onChange={(e) => setSelectedLocation(e.target.value)} className="bg-transparent font-bold text-gray-700 outline-none cursor-pointer">
+                <option value="全部">全部地方</option><option value="蝦皮">蝦皮</option><option value="屈臣氏">屈臣氏</option>
               </select>
             </div>
 
-            <div className="flex items-center gap-2 bg-orange-50 px-3 py-2 rounded-xl border border-orange-200">
-              <label className="text-sm font-bold text-orange-600">日期：</label>
-              <input 
-                type="date" 
-                value={selectedDate} 
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-transparent font-bold text-orange-700 outline-none cursor-pointer"
+            <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200">
+              <label className="text-sm font-bold text-gray-500">人員：</label>
+              <select value={selectedBuyer} onChange={(e) => setSelectedBuyer(e.target.value)} className="bg-transparent font-bold text-gray-700 outline-none cursor-pointer">
+                <option value="全部">全部總計</option><option value="洪">洪</option><option value="雅">雅</option><option value="宥">宥</option><option value="崑">崑</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2 bg-orange-50 px-3 py-2 rounded-xl border border-orange-200 w-32 relative">
+              <label className="text-sm font-bold text-orange-600 shrink-0">日期：</label>
+              <DatePicker
+                selected={new Date(selectedDate)}
+                onChange={(date) => {
+                  if (date) {
+                    const localDateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                    setSelectedDate(localDateStr);
+                  }
+                }}
+                dateFormat="MM-dd" // 🌟 修改這裡：隱藏年份，只顯示 月-日
+                className="font-black text-orange-700 w-full tracking-wider"
+                renderDayContents={(day, date) => {
+                  const currentDayStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                  const locationType = dateLocationMap.get(currentDayStr);
+                  
+                  // 🌟 核心：根據不同通路決定點點的顏色
+                  let dotColor = "";
+                  if (locationType === "蝦皮") dotColor = "bg-orange-500";          // 蝦皮代表色 (橘色)
+                  else if (locationType === "屈臣氏") dotColor = "bg-teal-400";     // 屈臣氏代表色 (藍綠色)
+                  else if (locationType === "both") dotColor = "bg-purple-500";     // 都有買的特別色 (紫色)
+                  
+                  return (
+                    <div className="relative flex justify-center items-center h-full w-full">
+                      <span>{day}</span>
+                      {locationType && (
+                        <span className={`absolute bottom-[-2px] w-1.5 h-1.5 rounded-full ${dotColor}`}></span>
+                      )}
+                    </div>
+                  );
+                }}
               />
             </div>
           </div>
         </div>
 
-        {/* 統計圖表區塊 */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
           <div className="mb-6">
             <h2 className="text-lg font-bold text-gray-700">
-              📦 {selectedDate} <span style={{ color: BUYER_COLORS[selectedBuyer] }}>{selectedBuyer}</span> 的購買總覽與排行
+              📦 {selectedDate} <span style={{ color: BUYER_COLORS[selectedBuyer] }}>{selectedBuyer}</span> 在【{selectedLocation}】的購買總覽與排行
             </h2>
-            <p className="text-sm text-gray-400 mt-1">系統已自動為您統整當日的財務指標，並將品項由高至低進行數量排序。</p>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 mt-2">
+              <p className="text-sm text-gray-400">系統已自動為您統整選定篩選範圍內的財務指標，並將品項由高至低進行數量排序。</p>
+              {/* 🌟 日曆顏色圖例說明 */}
+              <div className="flex items-center gap-3 text-xs font-bold text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-500"></span>蝦皮紀錄</span>
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-teal-400"></span>屈臣氏紀錄</span>
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-purple-500"></span>皆有紀錄</span>
+              </div>
+            </div>
           </div>
 
-          {/* 🌟 新增：當日數據總覽四大卡片區塊 */}
           {chartData.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               <div className="bg-gray-50/60 rounded-2xl p-4 border border-gray-100 shadow-sm">
@@ -211,40 +276,20 @@ export default function StatisticsPage() {
 
           {chartData.length > 0 ? (
             <div className="w-full h-[450px]">
-              {/* 💡 使用 99% 寬度完美消除 Recharts 的初始尺寸警告 */}
               <ResponsiveContainer width="99%" height="100%">
                 <BarChart data={chartData} margin={{ top: 20, right: 0, left: -20, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{ fill: '#6B7280', fontSize: 12, fontWeight: 'bold' }} 
-                    angle={-45} 
-                    textAnchor="end"
-                    interval={0} 
-                  />
+                  <XAxis dataKey="name" tick={{ fill: '#6B7280', fontSize: 12, fontWeight: 'bold' }} angle={-45} textAnchor="end" interval={0} />
                   <YAxis allowDecimals={false} tick={{ fill: '#6B7280', fontWeight: 'bold' }} />
-                  
-                  <Tooltip 
-                    content={<CustomTooltip />} 
-                    cursor={{ fill: '#F3F4F6' }}
-                  />
-                  
-                  <Bar 
-                    dataKey="quantity" 
-                    fill={BUYER_COLORS[selectedBuyer] || BUYER_COLORS["全部"]} 
-                    radius={[6, 6, 0, 0]} 
-                    name="購買數量" 
-                    barSize={40} 
-                  />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#F3F4F6' }} />
+                  <Bar dataKey="quantity" fill={BUYER_COLORS[selectedBuyer] || BUYER_COLORS["全部"]} radius={[6, 6, 0, 0]} name="購買數量" barSize={40} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
             <div className="h-[300px] flex flex-col justify-center items-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
               <span className="text-4xl mb-2">📭</span>
-              <p className="text-gray-400 font-bold">
-                {selectedBuyer === "全部" ? "該日期目前沒有人在蝦皮購買商品" : `${selectedBuyer} 在這天沒有蝦皮購買紀錄`}
-              </p>
+              <p className="text-gray-400 font-bold">該日期在選定條件下沒有任何購買紀錄</p>
             </div>
           )}
         </div>
