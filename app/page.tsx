@@ -58,7 +58,7 @@ export default function Home() {
         <Dashboard records={records} />
         
         {/* 🌟 傳遞 targetStore 與設定函式 */}
-        <PickupStats records={records} targetStore={targetStore} setTargetStore={setTargetStore} />
+        <PickupStats records={records} targetStore={targetStore} setTargetStore={setTargetStore} stores={stores}/>
         
         <StoreManager stores={stores} refreshData={fetchData} />
         <ItemManager items={items} refreshData={fetchData} />

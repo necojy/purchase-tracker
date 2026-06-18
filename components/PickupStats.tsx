@@ -2,22 +2,44 @@
 
 import { useMemo, useState } from "react";
 
+// 🌟 新增 Store 的型別定義
+type Store = { id: number; name: string; category: string; };
 type RecordType = { id: number; pickupLocation: string; pickupCategory: string; isReconciled: boolean; isRefunded: boolean; };
-// 🌟 更新 Props 接收狀態
-type Props = { records: RecordType[]; targetStore: string | null; setTargetStore: (store: string | null) => void; };
 
-export default function PickupStats({ records, targetStore, setTargetStore }: Props) {
+// 🌟 更新 Props，要求接收 stores 字典 (設為可選避免報錯)
+type Props = { 
+  records: RecordType[]; 
+  targetStore: string | null; 
+  setTargetStore: (store: string | null) => void; 
+  stores?: Store[]; 
+};
+
+export default function PickupStats({ records, targetStore, setTargetStore, stores = [] }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const activeRecords = useMemo(() => records.filter(r => !r.isReconciled && !r.isRefunded), [records]);
 
   const getStats = (category: string) => {
-    const list = activeRecords.filter(r => r.pickupCategory === category);
+    // 🌟 核心修復：不再盲目相信訂單舊資料，直接拿店名去店家總表反查真實分類！
+    const list = activeRecords.filter(r => {
+      const locName = r.pickupLocation || "";
+      const actualStore = stores.find(s => s.name === locName);
+      
+      if (actualStore) {
+        // 如果在常用店家清單有找到這家店，絕對以店家設定的分類為準
+        return actualStore.category === category;
+      } else {
+        // 如果找不到(可能是手動亂填的舊資料)，才退而求其次用訂單原本的分類
+        return r.pickupCategory === category;
+      }
+    });
+
     const counts: { [key: string]: number } = {};
     list.forEach(r => {
       const loc = r.pickupLocation || "未填寫店名";
       counts[loc] = (counts[loc] || 0) + 1;
     });
+
     const entries = Object.entries(counts);
     if (entries.length === 0) return { entries: [], minLoc: "無", total: 0 };
     const minCount = Math.min(...entries.map(e => e[1]));
@@ -31,12 +53,10 @@ export default function PickupStats({ records, targetStore, setTargetStore }: Pr
 
   if (totalActive === 0) return null;
 
-  // 🌟 點擊店鋪時的處理邏輯
   const handleStoreClick = (loc: string) => {
-    const newTarget = loc === targetStore ? null : loc; // 點擊一樣的就取消篩選
+    const newTarget = loc === targetStore ? null : loc; 
     setTargetStore(newTarget);
     
-    // 如果是選中狀態，稍微延遲一下讓 RecordManager 渲染好，再平滑捲動過去
     if (newTarget) {
       setTimeout(() => {
         document.getElementById('record-manager-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -65,7 +85,6 @@ export default function PickupStats({ records, targetStore, setTargetStore }: Pr
             </div>
             <div className="space-y-2">
               {shp.entries.length > 0 ? shp.entries.map(([loc, count]) => (
-                // 🌟 改成可點擊的按鈕，並加上動態樣式
                 <div 
                   key={loc} 
                   onClick={() => handleStoreClick(loc)}
@@ -86,7 +105,6 @@ export default function PickupStats({ records, targetStore, setTargetStore }: Pr
             </div>
             <div className="space-y-2">
               {cvs.entries.length > 0 ? cvs.entries.map(([loc, count]) => (
-                // 🌟 改成可點擊的按鈕，並加上動態樣式
                 <div 
                   key={loc} 
                   onClick={() => handleStoreClick(loc)}
