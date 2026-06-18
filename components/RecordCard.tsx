@@ -5,9 +5,8 @@ import { useState } from "react";
 type Item = { id: number; name: string; sellPrice: number; originalPrice: number; };
 type PurchaseItem = { id: number; quantity: number; costPrice: string | number; item: Item; itemId: number; };
 type RecordType = { id: number; location: string; buyer: string; paymentMethod: string; purchaseDate: string; items: PurchaseItem[]; pickupLocation: string; isReconciled: boolean; isRefunded: boolean; };
-type Store = { id: number; name: string; category: string; }; // 🌟 新增 Store 型別
+type Store = { id: number; name: string; category: string; };
 
-// 🌟 接收 stores 總表
 type Props = { record: RecordType; items: Item[]; stores: Store[]; refreshData: () => void; onCopy?: () => void; };
 
 export default function RecordCard({ record, items, stores, refreshData, onCopy }: Props) {
@@ -36,7 +35,6 @@ export default function RecordCard({ record, items, stores, refreshData, onCopy 
   };
 
   const handleSaveEdit = async () => {
-    // 🌟 嚴格防呆審查：未選購買人或地點不准存檔！
     if (!editForm.buyer) { alert("❌ 請選擇購買人"); return; }
     if (!editForm.pickupLocation) { alert("❌ 請選擇取貨地點"); return; }
     if (editItems.some(i => i.costPrice === "")) { alert("❌ 請填寫所有商品的進貨單價"); return; }
@@ -78,12 +76,12 @@ export default function RecordCard({ record, items, stores, refreshData, onCopy 
   const dateObj = new Date(record.purchaseDate);
   const localDateString = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
 
-  // 🌟 動態過濾：依據購買地方(蝦皮/屈臣氏)決定下拉選單要出現哪些店
-  const availableStores = stores.filter(s => s.category === (editForm.location === "蝦皮" ? "SHP" : "CVS"));
+  const availableStores = stores ? stores.filter(s => s.category === (editForm.location === "蝦皮" ? "SHP" : "CVS")) : [];
 
   return (
     <div className={`bg-white rounded-[2rem] shadow-sm border overflow-hidden transition-all duration-300 ${cardStyle} ${isExpanded ? 'ring-2 ring-blue-100' : ''}`}>
-      <div onClick={toggleExpand} className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between cursor-pointer hover:bg-gray-50/50 transition gap-4 md:gap-0">
+      <div onClick={toggleExpand} className="p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between cursor-pointer hover:bg-gray-50/50 transition gap-4 md:gap-0">
+        
         <div className="flex items-center gap-4 w-full md:w-[30%]">
           <span className="text-blue-600 font-bold text-sm bg-blue-50 px-3 py-1 rounded-full">{localDateString}</span>
           <div className={`font-black text-lg flex items-center gap-2 ${(record.isReconciled || record.isRefunded) ? 'line-through text-gray-400' : ''}`}>
@@ -97,11 +95,26 @@ export default function RecordCard({ record, items, stores, refreshData, onCopy 
           <div><p className="text-green-500 text-xs font-bold mb-1">總獲利</p><p className={`font-black text-xl ${record.isRefunded ? 'line-through text-gray-400' : (recordTotalProfit >= 0 ? 'text-green-500' : 'text-red-500')}`}>{recordTotalProfit >= 0 ? `+$${recordTotalProfit}` : `-$${Math.abs(recordTotalProfit)}`}</p></div>
         </div>
         
-        <div className="flex items-center gap-3 w-full md:w-[40%] justify-start md:justify-end">
-          <span className="flex items-center gap-1 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg text-sm font-medium">👤 {record.buyer || "未選"}</span>
-          <span className="flex items-center gap-1 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg text-sm font-medium">📍 {record.location}</span>
+        {/* 🌟 核心修改區塊：加入彈性換行與新標籤 */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:flex-1 justify-start md:justify-end">
           
-          <div className="flex items-center gap-3 pl-4 border-l ml-auto md:ml-0" onClick={(e) => e.stopPropagation()}>
+          {/* 🌟 1. 貨到付款專屬標記 */}
+          {record.paymentMethod === "貨到付款" && (
+            <span className="flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 px-2.5 py-1 rounded-lg text-xs font-black shadow-sm">
+              💰 貨到付款
+            </span>
+          )}
+          
+          <span className="flex items-center gap-1 bg-gray-100 text-gray-600 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap">
+            👤 {record.buyer || "未選"}
+          </span>
+          
+          {/* 🌟 2. 顯示「店名 (購買平台)」 */}
+          <span className="flex items-center gap-1 bg-gray-100 text-gray-600 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap">
+            🏪 {record.pickupLocation || "未選店"} ({record.location})
+          </span>
+          
+          <div className="flex items-center gap-3 pl-2 sm:border-l sm:ml-2 ml-auto" onClick={(e) => e.stopPropagation()}>
             <button onClick={handleToggleRefund} className={`text-xs font-bold px-2 py-1 rounded border ${record.isRefunded ? 'bg-gray-100 text-gray-500 border-gray-300' : 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'}`}>
               {record.isRefunded ? '取消退款' : '標記退款'}
             </button>
@@ -110,8 +123,9 @@ export default function RecordCard({ record, items, stores, refreshData, onCopy 
               <input type="checkbox" checked={record.isReconciled} onChange={handleToggleReconcile} disabled={record.isRefunded} className="w-5 h-5 accent-blue-600 rounded cursor-pointer disabled:opacity-50" />
             </label>
           </div>
-          <div className={`ml-2 text-blue-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▼</div>
+          <div className={`ml-1 text-blue-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▼</div>
         </div>
+
       </div>
 
       {isExpanded && (
@@ -119,7 +133,6 @@ export default function RecordCard({ record, items, stores, refreshData, onCopy 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="w-full">
               <label className="block text-xs font-bold text-gray-400 mb-1">購買人</label>
-              {/* 🌟 加入預設為空的 option */}
               <select value={editForm.buyer} onChange={(e) => setEditForm({...editForm, buyer: e.target.value})} disabled={record.isRefunded} className="w-full border rounded-xl p-2.5 bg-white text-sm font-bold disabled:opacity-50 focus:border-blue-400 outline-none">
                 <option value="" disabled>請選擇人員</option>
                 <option value="洪">洪</option>
@@ -145,7 +158,6 @@ export default function RecordCard({ record, items, stores, refreshData, onCopy 
             </div>
             <div className="w-full">
               <label className="block text-xs font-bold text-gray-400 mb-1">取貨地點</label>
-              {/* 🌟 將輸入框升級成下拉選單 */}
               <select value={editForm.pickupLocation} onChange={(e) => setEditForm({...editForm, pickupLocation: e.target.value})} disabled={record.isRefunded} className="w-full border rounded-xl p-2.5 bg-white text-sm font-bold disabled:opacity-50 focus:border-blue-400 outline-none">
                 <option value="" disabled>請選擇店名</option>
                 {availableStores.map(store => (
