@@ -5,16 +5,18 @@ import RecordCard from "../RecordCard";
 type Item = { id: number; name: string; sellPrice: number; originalPrice: number; maxQuantity: number; };
 type PurchaseItem = { id: number; quantity: number; costPrice: string | number; item: Item; itemId: number; };
 type RecordType = { id: number; location: string; buyer: string; paymentMethod: string; purchaseDate: string; items: PurchaseItem[]; pickupLocation: string; isReconciled: boolean; isRefunded: boolean; };
+type Store = { id: number; name: string; category: string; }; // 🌟 補上型別
 
-// 🌟 新增：接收 onCopy 函式
+// 🌟 新增 stores 屬性
 type Props = {
   records: RecordType[];
   items: Item[];
+  stores: Store[];
   refreshData: () => void;
   onCopy: (record: RecordType) => void; 
 };
 
-export default function RecordGroupList({ records, items, refreshData, onCopy }: Props) {
+export default function RecordGroupList({ records, items, stores, refreshData, onCopy }: Props) {
   const groupRecordsByDate = (recordsToGroup: RecordType[]) => {
     const grouped: { [key: string]: RecordType[] } = {};
     
@@ -49,8 +51,9 @@ export default function RecordGroupList({ records, items, refreshData, onCopy }:
                 key={record.id} 
                 record={record} 
                 items={items} 
+                stores={stores} // 🌟 將總表遞送給卡片
                 refreshData={refreshData} 
-                onCopy={() => onCopy(record)} // 🌟 將指令傳給卡片
+                onCopy={() => onCopy(record)}
               />
             ))}
           </div>

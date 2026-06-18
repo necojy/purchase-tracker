@@ -87,7 +87,7 @@ export default function RecordManager({ items, records, stores, refreshData, tar
             目前沒有符合條件的進行中訂單
           </div>
         ) : (
-          <RecordGroupList records={activeRecords} items={items} refreshData={refreshData} onCopy={handleCopyRecord} />
+          <RecordGroupList records={activeRecords} items={items} stores={stores} refreshData={refreshData} onCopy={handleCopyRecord} />
         )}
       </div>
 
@@ -99,7 +99,7 @@ export default function RecordManager({ items, records, stores, refreshData, tar
           </button>
           {showReconciled && (
             <div className="animate-fade-in">
-              <RecordGroupList records={reconciledRecords} items={items} refreshData={refreshData} onCopy={handleCopyRecord} />
+              <RecordGroupList records={reconciledRecords} items={items} stores={stores} refreshData={refreshData} onCopy={handleCopyRecord} />
             </div>
           )}
         </div>
@@ -113,7 +113,7 @@ export default function RecordManager({ items, records, stores, refreshData, tar
           </button>
           {showRefunded && (
             <div className="animate-fade-in">
-              <RecordGroupList records={refundedRecords} items={items} refreshData={refreshData} onCopy={handleCopyRecord} />
+              <RecordGroupList records={refundedRecords} items={items} stores={stores} refreshData={refreshData} onCopy={handleCopyRecord} />
             </div>
           )}
         </div>

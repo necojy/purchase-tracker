@@ -14,20 +14,22 @@ export default function BasicInfoSection({ recordForm, setRecordForm, currentCat
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
       <div className="w-full">
         <label className="block text-sm text-gray-500 mb-1">購買人</label>
-        <select value={recordForm.buyer} onChange={(e) => setRecordForm((prev: any) => ({...prev, buyer: e.target.value}))} className="w-full border rounded-xl p-3 bg-gray-50 font-medium outline-none">
-          <option>洪</option><option>雅</option><option>宥</option><option>崑</option>
+        {/* 🌟 加上「請選擇人員」空選項 */}
+        <select value={recordForm.buyer} onChange={(e) => setRecordForm((prev: any) => ({...prev, buyer: e.target.value}))} className="w-full border rounded-xl p-3 bg-gray-50 font-medium outline-none focus:border-blue-400">
+          <option value="" disabled>請選擇人員</option>
+          <option value="洪">洪</option><option value="雅">雅</option><option value="宥">宥</option><option value="崑">崑</option>
         </select>
       </div>
       <div className="w-full">
         <label className="block text-sm text-gray-500 mb-1">購買地方</label>
         <select value={recordForm.location} onChange={(e) => setRecordForm((prev: any) => ({...prev, location: e.target.value}))} className="w-full border rounded-xl p-3 bg-gray-50 font-medium outline-none">
-          <option>蝦皮</option><option>屈臣氏</option>
+          <option value="蝦皮">蝦皮</option><option value="屈臣氏">屈臣氏</option>
         </select>
       </div>
       <div className="w-full">
         <label className="block text-sm text-gray-500 mb-1">付款方式</label>
         <select value={recordForm.paymentMethod} onChange={(e) => setRecordForm((prev: any) => ({...prev, paymentMethod: e.target.value}))} className="w-full border rounded-xl p-3 bg-gray-50 font-medium outline-none">
-          <option>貨到付款</option><option>信用卡</option><option>匯款</option>
+          <option value="貨到付款">貨到付款</option><option value="信用卡">信用卡</option><option value="匯款">匯款</option>
         </select>
       </div>
       
@@ -41,18 +43,19 @@ export default function BasicInfoSection({ recordForm, setRecordForm, currentCat
 
       <div className="w-full">
         <label className="block text-sm text-gray-500 mb-1">取貨店名</label>
+        {/* 🌟 加上「請選擇店名」空選項 */}
         <select 
           value={recordForm.pickupLocation} 
           onChange={(e) => setRecordForm((prev: any) => ({...prev, pickupLocation: e.target.value}))} 
-          className={`w-full border rounded-xl p-3 bg-gray-50 font-medium outline-none transition ${currentCategoryStores.length === 0 ? 'text-red-400 border-red-300' : 'focus:border-blue-400'}`}
-          required
+          className={`w-full border rounded-xl p-3 bg-gray-50 font-medium outline-none transition focus:border-blue-400`}
         >
+          <option value="" disabled>請選擇店名</option>
           {currentCategoryStores.length > 0 ? (
             currentCategoryStores.map(store => (
               <option key={store.id} value={store.name}>{store.name}</option>
             ))
           ) : (
-            <option value="">請先新增上方預設店家</option>
+            <option value="" disabled>上方無預設店家</option>
           )}
         </select>
       </div>

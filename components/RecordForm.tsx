@@ -12,16 +12,15 @@ type Props = { items: Item[]; records: RecordType[]; stores: Store[]; refreshDat
 
 export default function RecordForm({ items, stores, refreshData, onClose }: Props) {
   const [recordForm, setRecordForm] = useState({ 
-    costPrice: "", location: "蝦皮", buyer: "洪", 
+    // 🌟 預設全部為空，強制手動選擇
+    costPrice: "", location: "蝦皮", buyer: "", 
     paymentMethod: "信用卡", pickupLocation: "", pickupCategory: "SHP" 
   });
   
   const [recordItems, setRecordItems] = useState([{ itemId: "", quantity: 1, originalPrice: "", costPrice: "" }]);
 
-  // 🌟 修復版：處理時間差問題，保護記憶體不被提前洗掉
-// 🌟 完美防護版：解決 React 兩次執行導致的時間差覆蓋 Bug
   useEffect(() => {
-    if (items.length === 0) return; // 保護機制：商品資料還沒載入完前，不要動作
+    if (items.length === 0) return; 
 
     if (typeof window !== "undefined") {
       const pendingStr = localStorage.getItem("pendingAutoRecord");
@@ -30,10 +29,8 @@ export default function RecordForm({ items, stores, refreshData, onClose }: Prop
           const pendingData = JSON.parse(pendingStr);
           if (pendingData && pendingData.items && pendingData.items.length > 0) {
             
-            // 帶入商品列表
             setRecordItems(pendingData.items);
             
-            // 帶入其他表單細節
             setRecordForm(prev => ({
               ...prev,
               costPrice: pendingData.totalPrice || prev.costPrice,
@@ -44,9 +41,8 @@ export default function RecordForm({ items, stores, refreshData, onClose }: Prop
               pickupLocation: pendingData.pickupLocation || prev.pickupLocation
             }));
 
-            // 確認成功讀取後，刪除記憶體
             localStorage.removeItem("pendingAutoRecord");
-            return; // 成功複製後，立刻結束這個回合！
+            return; 
           }
         } catch (e) {
           console.error("解析待處理資料失敗", e);
@@ -54,33 +50,18 @@ export default function RecordForm({ items, stores, refreshData, onClose }: Prop
       }
     }
 
-    // 🌟 關鍵修正：利用 prevItems (最新狀態) 來檢查，確保剛複製進去的資料不會被洗掉
     setRecordItems(prevItems => {
-      // 如果「目前畫面上的狀態」真的沒有商品，才給予預設值
       if (!prevItems[0].itemId && items.length > 0) {
-        return [{ 
-          itemId: items[0].id.toString(), 
-          quantity: 1, 
-          originalPrice: items[0].originalPrice?.toString() || "", 
-          costPrice: "" 
-        }];
+        return [{ itemId: items[0].id.toString(), quantity: 1, originalPrice: items[0].originalPrice?.toString() || "", costPrice: "" }];
       }
-      // 如果已經有資料（剛剛複製進來的），就保持原樣，絕對不覆蓋
       return prevItems;
     });
 
   }, [items]);
 
-  useEffect(() => {
-    const currentCategoryStores = stores.filter(s => s.category === recordForm.pickupCategory);
-    if (!recordForm.pickupLocation && currentCategoryStores.length > 0) {
-      setRecordForm(prev => ({ ...prev, pickupLocation: currentCategoryStores[0].name }));
-    }
-  }, [stores, recordForm.pickupCategory, recordForm.pickupLocation]);
-
   const handleCategoryChange = (cat: string) => {
-    const catStores = stores.filter(s => s.category === cat);
-    setRecordForm({ ...recordForm, pickupCategory: cat, pickupLocation: catStores.length > 0 ? catStores[0].name : "" });
+    // 🌟 關閉自動帶入邏輯，切換通路時清空店名，強迫重選
+    setRecordForm({ ...recordForm, pickupCategory: cat, pickupLocation: "" });
   };
 
   const handleAutoDistribute = () => {
@@ -133,8 +114,10 @@ export default function RecordForm({ items, stores, refreshData, onClose }: Prop
 
   const handleAddRecord = async (e: React.FormEvent) => {
     e.preventDefault();
+    // 🌟 表單嚴格防呆審查
+    if (!recordForm.buyer) { alert("❌ 請選擇購買人！"); return; }
+    if (!recordForm.pickupLocation) { alert("❌ 請選擇取貨店名！"); return; }
     if (recordItems.some(i => i.costPrice === "")) { alert("❌ 請點擊自動分配按鈕，或手動填寫進貨價"); return; }
-    if (!recordForm.pickupLocation) { alert("❌ 請先至上方「常用店家清單」新增對應的取貨店名！"); return; }
 
     try {
       const res = await fetch("/api/records", { 
